@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Tauk",
+    "slug": "tauk",
+    "scheme": "tauk",
+    "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#FF1486"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tauk.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Tauk utilise la caméra pour scanner les codes QR.",
+        "UIRequiresFullScreen": true
+      }
+    },
+    "android": {
+      "package": "com.tauk.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#FF1486",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "add5f270-80ac-4740-abb1-f8d4cbe1e7c1"
+      },
+      "router": {}
+    },
+    "owner": "komplo"
+  }
+}
