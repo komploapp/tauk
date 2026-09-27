@@ -162,7 +162,7 @@ export default function ConfigScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.topBar}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => { playSound('uiPress'); router.back(); }}
             style={styles.backBtn}
             accessibilityRole="button"
             accessibilityLabel="Retour"
@@ -241,7 +241,7 @@ export default function ConfigScreen() {
           </View>
           <Pressable
             style={{ flex: 1 }}
-            onPress={() => !loading && setModalVisible(false)}
+            onPress={() => { if (!loading) { playSound('uiPress'); setModalVisible(false); } }}
           />
           <KeyboardAvoidingView
           style={styles.modalWrap}
@@ -325,7 +325,7 @@ export default function ConfigScreen() {
                 (loading || pseudo.trim().length < 2) && styles.modalBtnDisabled,
                 pressed && styles.pressed,
               ]}
-              onPress={handleCreate}
+              onPress={() => { playSound('uiPress'); handleCreate(); }}
               disabled={loading}
               accessibilityRole="button"
             >

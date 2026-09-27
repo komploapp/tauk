@@ -92,7 +92,12 @@ export default function SpectateurScreen() {
           }
           if (result !== 'denied' && result !== 'confirmed') return;
 
-          const { players: ps, myPlayer: me } = useStore.getState();
+          // Sync le résultat dans le store pour que useFocusEffect dans game.tsx
+          // ne tente pas d'annuler une accusation déjà résolue au retour.
+          const { players: ps, myPlayer: me, setActiveAccusation: syncAccusation, activeAccusation: currAccusation } = useStore.getState();
+          if (currAccusation) {
+            syncAccusation({ ...currAccusation, result: result as 'confirmed' | 'denied' });
+          }
           const accuserPlayer = ps.find((p) => p.id === newRow.accuser_id);
           const accusedPlayer = ps.find((p) => p.id === newRow.accused_id);
           const iAmAccuser = me?.id === newRow.accuser_id;

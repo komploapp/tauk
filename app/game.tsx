@@ -16,7 +16,7 @@ import { ToqueBackground } from '@/components/ToqueBackground';
 import { AccuseOverlay } from '@/components/AccuseOverlay';
 import { GameMenu } from '@/components/GameMenu';
 import { palette, spacing } from '@/constants/palette';
-import { markTaskDone, createAccusation, kickPlayer, broadcastPlayerLeft } from '@/lib/game';
+import { markTaskDone, createAccusation, cancelAccusation, kickPlayer, broadcastPlayerLeft } from '@/lib/game';
 import { usePlayerLeft } from '@/hooks/usePlayerLeft';
 import { PlayerLeftModal } from '@/components/PlayerLeftModal';
 import { supabase } from '@/lib/supabase';
@@ -434,11 +434,18 @@ export default function GameScreen() {
   // Appel idempotent : la fonction SQL vérifie paused_since IS NOT NULL.
   useFocusEffect(
     useCallback(() => {
-      const { activeAccusation, currentRound: round } = useStore.getState();
-      if (round?.paused_since && activeAccusation?.id) {
+      const { activeAccusation, currentRound: round, myPlayer: me } = useStore.getState();
+      // Swipe-back depuis /spectateur : l'accusation est encore pending → l'annuler
+      if (activeAccusation?.result === 'pending' && activeAccusation.accuser_id === me?.id) {
+        cancelAccusation(activeAccusation.id).catch(() => {});
+      } else if (round?.paused_since && activeAccusation?.id) {
         supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: activeAccusation.id }).catch(() => {});
       }
       deactivateTauk();
+      // Masquer l'overlay TAUK (peut rester visible si retour avant fin de transition)
+      taukOverlayOpacity.value = 0;
+      taukTextOpacity.value = 0;
+      taukScaleY.value = 1;
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
@@ -722,6 +729,7 @@ export default function GameScreen() {
           }}
           style={({ pressed }) => [styles.taukBtn, pressed && styles.taukBtnPressed]}
           onPress={() => {
+            playSound('taukBell');
             activateTauk();
             if (otherPlayers.length === 1) {
               playTaukTransition(() => {

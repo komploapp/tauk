@@ -252,6 +252,7 @@ export default function PrepaScreen() {
   const { game, currentRound, myPlayer, setMyTasks, reset } = useStore();
 
   useEffect(() => { stopThemeMusic(); }, []);
+  useEffect(() => { playSound('decompteCountdown'); }, []);
   const { leftPlayer, isGameOver, dismissPlayerLeft } = usePlayerLeft();
   const [localTasks,    setLocalTasks]    = useState<PlayerTask[]>([]);
   const [countdown,     setCountdown]     = useState(COUNTDOWN_START);

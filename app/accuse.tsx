@@ -54,6 +54,8 @@ const CHARACTER_BG: Record<Character, string> = {
 export default function AccuseScreen() {
   const [challengeVisible, setChallengeVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+
+  useEffect(() => { playSound('accusation'); }, []);
   const [pointModalData, setPointModalData] = useState<PointAttributionData | null>(null);
   const postModalRef = useRef<() => void>(() => {});
   const roundStatusRef   = useRef<ReturnType<typeof supabase.channel> | null>(null);

@@ -160,7 +160,7 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
 
             <Pressable
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              onPress={() => setMuted(!muted)}
+              onPress={() => { playSound('uiPress'); setMuted(!muted); }}
               accessibilityRole="switch"
               accessibilityLabel={muted ? 'Activer les effets sonores' : 'Couper les effets sonores'}
             >
@@ -181,7 +181,7 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
 
             <Pressable
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              onPress={() => setMusicMuted(!musicMuted)}
+              onPress={() => { playSound('uiPress'); setMusicMuted(!musicMuted); }}
               accessibilityRole="switch"
               accessibilityLabel={musicMuted ? 'Activer la musique' : 'Couper la musique'}
             >
@@ -202,7 +202,7 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
 
             <Pressable
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              onPress={() => { onClose(); setTimeout(() => setRulesVisible(true), 250); }}
+              onPress={() => { playSound('uiPress'); onClose(); setTimeout(() => setRulesVisible(true), 250); }}
               accessibilityRole="button"
               accessibilityLabel="Règles du jeu"
             >

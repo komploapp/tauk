@@ -104,7 +104,7 @@ function MyCard({ player, onSave }: MyCardProps) {
       ) : (
         <Pressable
           style={({ pressed }) => [styles.meNameChip, pressed && styles.pressed]}
-          onPress={() => { setDraft(player.pseudo); setEditing(true); }}
+          onPress={() => { playSound('uiPress'); setDraft(player.pseudo); setEditing(true); }}
           accessibilityRole="button"
           accessibilityLabel={`Modifier le pseudo : ${player.pseudo}`}
         >
@@ -492,7 +492,7 @@ export default function HostScreen() {
             <Text style={styles.notifBody}>L'hôte t'a retiré de la partie.</Text>
             <Pressable
               style={({ pressed }) => [styles.notifBtn, pressed && styles.pressed]}
-              onPress={() => { setKickedNotif(false); useStore.getState().reset(); router.replace('/'); }}
+              onPress={() => { playSound('uiPress'); setKickedNotif(false); useStore.getState().reset(); router.replace('/'); }}
               accessibilityRole="button"
             >
               <Text style={styles.notifBtnText}>OK</Text>
@@ -519,7 +519,7 @@ export default function HostScreen() {
             <Text style={styles.notifBody}>Tu peux désormais gérer la partie.</Text>
             <Pressable
               style={({ pressed }) => [styles.notifBtn, styles.notifBtnGreen, pressed && styles.pressed]}
-              onPress={() => setNewHostNotif(false)}
+              onPress={() => { playSound('uiPress'); setNewHostNotif(false); }}
               accessibilityRole="button"
             >
               <Text style={styles.notifBtnText}>Super !</Text>
@@ -548,14 +548,14 @@ export default function HostScreen() {
             <Text style={styles.notifBody}>{timerSuggestion?.line2}</Text>
             <Pressable
               style={({ pressed }) => [styles.notifBtn, styles.notifBtnGreen, pressed && styles.pressed]}
-              onPress={handleSuggestionAccept}
+              onPress={() => { playSound('uiPress'); handleSuggestionAccept(); }}
               accessibilityRole="button"
             >
               <Text style={styles.notifBtnText}>Ok, c'est parti !</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.notifBtn, styles.suggBtnOutline, pressed && styles.pressed]}
-              onPress={handleSuggestionDecline}
+              onPress={() => { playSound('uiPress'); handleSuggestionDecline(); }}
               accessibilityRole="button"
             >
               <Text style={styles.suggBtnOutlineText}>Je conserve mon réglage</Text>
@@ -593,7 +593,7 @@ export default function HostScreen() {
 
                   <Pressable
                     style={({ pressed }) => [styles.adminAction, pressed && styles.pressed]}
-                    onPress={() => handleTransferHost(adminTarget)}
+                    onPress={() => { playSound('uiPress'); handleTransferHost(adminTarget); }}
                   >
                     <Ionicons name="swap-horizontal-outline" size={18} color={palette.brandGreen} />
                     <Text style={[styles.adminActionText, { color: palette.brandGreen }]}>
@@ -603,7 +603,7 @@ export default function HostScreen() {
 
                   <Pressable
                     style={({ pressed }) => [styles.adminAction, pressed && styles.pressed]}
-                    onPress={() => handleKickPlayer(adminTarget)}
+                    onPress={() => { playSound('uiPress'); handleKickPlayer(adminTarget); }}
                   >
                     <Ionicons name="exit-outline" size={18} color={palette.brandPink} />
                     <Text style={[styles.adminActionText, { color: palette.brandPink }]}>
@@ -622,7 +622,7 @@ export default function HostScreen() {
         <View style={styles.header}>
           <Pressable
             style={({ pressed }) => [styles.closeChip, pressed && styles.pressed]}
-            onPress={handleQuit}
+            onPress={() => { playSound('uiPress'); handleQuit(); }}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityRole="button"
             accessibilityLabel="Quitter"
@@ -656,7 +656,7 @@ export default function HostScreen() {
             </View>
             <Pressable
               style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
-              onPress={handleShare}
+              onPress={() => { playSound('uiPress'); handleShare(); }}
               accessibilityRole="button"
               accessibilityLabel="Partager"
             >
@@ -679,7 +679,7 @@ export default function HostScreen() {
                         key={p.id}
                         player={p}
                         isMe={false}
-                        onAdminPress={myPlayer?.is_host ? () => setAdminTarget(p) : undefined}
+                        onAdminPress={myPlayer?.is_host ? () => { playSound('uiPress'); setAdminTarget(p); } : undefined}
                       />
                     ) : (
                       <View key={`e-${ri}-${ci}`} style={styles.slot} />
@@ -700,7 +700,7 @@ export default function HostScreen() {
                 !canStart && styles.primaryBtnDisabled,
                 pressed && styles.pressed,
               ]}
-              onPress={handleStart}
+              onPress={() => { playSound('uiPress'); handleStart(); }}
               disabled={!canStart}
               accessibilityRole="button"
             >
@@ -712,7 +712,7 @@ export default function HostScreen() {
                 myPlayer?.is_ready ? styles.readyBtnDone : styles.readyBtn,
                 pressed && styles.pressed,
               ]}
-              onPress={handleReady}
+              onPress={() => { playSound('uiPress'); handleReady(); }}
               accessibilityRole="button"
             >
               <Text style={styles.primaryBtnText}>
