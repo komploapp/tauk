@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 
 import { palette, spacing } from '@/constants/palette';
 import type { Player, Character } from '@/store';
@@ -83,7 +82,6 @@ interface AccuseOverlayProps {
 
 export function AccuseOverlay({ visible, onClose, onConfirm, players }: AccuseOverlayProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [cancelVisible, setCancelVisible] = useState(false);
 
   const slots: Slot[] = players && players.length > 0
     ? players.map(playerToSlot)
@@ -93,12 +91,6 @@ export function AccuseOverlay({ visible, onClose, onConfirm, players }: AccuseOv
 
   function handleShow() {
     setSelectedId(null);
-    setCancelVisible(false);
-  }
-
-  function handleCancelConfirmed() {
-    setCancelVisible(false);
-    onClose();
   }
 
   return (
@@ -108,6 +100,7 @@ export function AccuseOverlay({ visible, onClose, onConfirm, players }: AccuseOv
       statusBarTranslucent
       animationType="slide"
       onShow={handleShow}
+      onRequestClose={onClose}
     >
       <View style={styles.backdrop} pointerEvents="none" />
 
@@ -115,17 +108,17 @@ export function AccuseOverlay({ visible, onClose, onConfirm, players }: AccuseOv
         <View style={styles.header} pointerEvents="box-none">
           <Pressable
             style={styles.headerBtn}
-            onPress={() => setCancelVisible(true)}
+            onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Retour"
+            accessibilityLabel="Annuler"
           >
             <Text style={styles.headerBtnText}>{'<'}</Text>
           </Pressable>
           <Pressable
             style={styles.headerBtn}
-            onPress={() => router.replace('/')}
+            onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Quitter"
+            accessibilityLabel="Annuler"
           >
             <Text style={styles.headerBtnText}>✕</Text>
           </Pressable>
@@ -166,38 +159,13 @@ export function AccuseOverlay({ visible, onClose, onConfirm, players }: AccuseOv
 
         <Pressable
           style={({ pressed }) => [styles.cancelBtn, pressed && styles.btnPressed]}
-          onPress={() => setCancelVisible(true)}
+          onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Annuler l'accusation"
         >
           <Text style={styles.cancelBtnInlineText}>Annuler</Text>
         </Pressable>
       </View>
-
-      {cancelVisible && (
-        <View style={styles.cancelOverlay}>
-          <View style={styles.cancelBox}>
-            <Text style={styles.cancelTitle}>Annuler l'accusation ?</Text>
-            <Text style={styles.cancelBody}>Voulez-vous vraiment annuler votre accusation ?</Text>
-            <View style={styles.cancelButtons}>
-              <Pressable
-                style={({ pressed }) => [styles.cancelBtnPrimary, pressed && styles.btnPressed]}
-                onPress={handleCancelConfirmed}
-                accessibilityRole="button"
-              >
-                <Text style={styles.cancelBtnText}>Oui, annuler</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.cancelBtnSecondary, pressed && styles.btnPressed]}
-                onPress={() => setCancelVisible(false)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.cancelBtnSecondaryText}>Continuer</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      )}
     </Modal>
   );
 }
@@ -239,22 +207,6 @@ const styles = StyleSheet.create({
   confirmBtnDisabled: { opacity: 0.4 },
   confirmBtnPressed: { opacity: 0.85 },
   confirmText: { fontFamily: 'Recursive_400Regular', fontSize: 20, color: '#ffffff' },
-  cancelOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(82, 0, 39, 0.45)',
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32,
-  },
-  cancelBox: {
-    width: '100%', backgroundColor: '#ffffff', borderRadius: 20,
-    paddingHorizontal: 24, paddingVertical: 32, gap: 16, alignItems: 'center',
-  },
-  cancelTitle: { fontFamily: 'Recursive_600SemiBold', fontSize: 20, color: palette.textPrimary, textAlign: 'center' },
-  cancelBody: { fontFamily: 'Recursive_400Regular', fontSize: 16, color: palette.textPrimary, textAlign: 'center', lineHeight: 22, opacity: 0.7 },
-  cancelButtons: { width: '100%', gap: 12, marginTop: 8 },
-  cancelBtnPrimary: { height: 47, backgroundColor: palette.brandPink, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  cancelBtnSecondary: { height: 47, backgroundColor: 'rgba(255, 20, 134, 0.08)', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  cancelBtnText: { fontFamily: 'Recursive_400Regular', fontSize: 18, color: '#ffffff' },
-  cancelBtnSecondaryText: { fontFamily: 'Recursive_400Regular', fontSize: 18, color: palette.brandPink },
   btnPressed: { opacity: 0.8 },
   cancelBtn: { paddingVertical: 10, paddingHorizontal: 24, alignItems: 'center' },
   cancelBtnInlineText: { fontFamily: 'Recursive_400Regular', fontSize: 16, color: palette.brandPink, opacity: 0.7 },

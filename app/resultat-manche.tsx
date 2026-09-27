@@ -13,6 +13,7 @@ import { PlayerLeftModal } from '@/components/PlayerLeftModal';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store';
 import type { Character, TaskStatus, Round } from '@/store';
+import { playSound } from '@/lib/sound';
 
 import ChousSvg     from '@/assets/images/personnages/character-choux.svg';
 import AvocadoSvg   from '@/assets/images/personnages/character-avocado.svg';

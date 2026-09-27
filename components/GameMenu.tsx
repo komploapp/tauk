@@ -4,8 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { RulesModal } from '@/components/RulesModal';
+import { TutorialModal } from '@/components/TutorialModal';
 import { palette, spacing, radius } from '@/constants/palette';
 import { useStore } from '@/store';
+import { playSound } from '@/lib/sound';
 
 const ROUND_OPTIONS = [3, 6, 10] as const;
 type RoundCount = 3 | 6 | 10;
@@ -60,13 +62,21 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
   const insets = useSafeAreaInsets();
   const muted = useStore((s) => s.muted);
   const setMuted = useStore((s) => s.setMuted);
+  const musicMuted = useStore((s) => s.musicMuted);
+  const setMusicMuted = useStore((s) => s.setMusicMuted);
   const [rulesVisible, setRulesVisible] = useState(false);
+  const [tutorialVisible, setTutorialVisible] = useState(false);
   const [restrictToastKey, setRestrictToastKey] = useState(0);
   const [restrictToastY,   setRestrictToastY]   = useState(200);
 
   return (
     <>
-      <RulesModal visible={rulesVisible} onClose={() => setRulesVisible(false)} />
+      <RulesModal
+        visible={rulesVisible}
+        onClose={() => setRulesVisible(false)}
+        onShowTutorial={() => { setRulesVisible(false); setTimeout(() => setTutorialVisible(true), 300); }}
+      />
+      <TutorialModal visible={tutorialVisible} onClose={() => setTutorialVisible(false)} />
       <Modal
         visible={visible}
         transparent
@@ -74,13 +84,12 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
         animationType="fade"
         onRequestClose={onClose}
       >
-        <View style={{ flex: 1 }}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.58)' }} onPress={onClose} accessible={false}>
           <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-            <BlurView style={StyleSheet.absoluteFillObject} intensity={20} tint="dark" />
+            <BlurView style={StyleSheet.absoluteFillObject} intensity={50} tint="dark" />
           </View>
           <RestrictToast toastKey={restrictToastKey} tapY={restrictToastY} />
-          <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose}>
-            <View style={[styles.sheet, { paddingTop: insets.top + 16 }]} onStartShouldSetResponder={() => true}>
+          <Pressable style={[styles.sheet, { paddingTop: insets.top + 16 }]} onPress={() => {}}>
             <Text style={styles.title}>Options</Text>
 
             {roundCount !== undefined && (
@@ -99,7 +108,7 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
                           roundCount === n && styles.roundChipActive,
                           pressed && isHost && styles.pressed,
                         ]}
-                        onPress={isHost && onRoundCountChange ? () => onRoundCountChange(n) : !isHost ? (e) => { setRestrictToastY(e.nativeEvent.pageY); setRestrictToastKey((k) => k + 1); } : undefined}
+                        onPress={isHost && onRoundCountChange ? () => { playSound('uiPress'); onRoundCountChange(n); } : !isHost ? (e) => { setRestrictToastY(e.nativeEvent.pageY); setRestrictToastKey((k) => k + 1); } : undefined}
                         accessibilityRole="button"
                         accessibilityLabel={`${n} services${roundCount === n ? ', sélectionné' : ''}`}
                       >
@@ -133,7 +142,7 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
                             active && styles.roundChipActive,
                             pressed && isHost && styles.pressed,
                           ]}
-                          onPress={isHost && onTimerDurationChange ? () => onTimerDurationChange(d) : !isHost ? (e) => { setRestrictToastY(e.nativeEvent.pageY); setRestrictToastKey((k) => k + 1); } : undefined}
+                          onPress={isHost && onTimerDurationChange ? () => { playSound('uiPress'); onTimerDurationChange(d); } : !isHost ? (e) => { setRestrictToastY(e.nativeEvent.pageY); setRestrictToastKey((k) => k + 1); } : undefined}
                           accessibilityRole="button"
                           accessibilityLabel={d === null ? 'Sans timer' : `${d / 60} min${active ? ', sélectionné' : ''}`}
                         >
@@ -153,18 +162,39 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               onPress={() => setMuted(!muted)}
               accessibilityRole="switch"
-              accessibilityLabel={muted ? 'Activer le son' : 'Couper le son'}
+              accessibilityLabel={muted ? 'Activer les effets sonores' : 'Couper les effets sonores'}
             >
               <View style={styles.rowLeft}>
                 <Ionicons
-                  name={muted ? 'volume-mute-outline' : 'volume-high-outline'}
+                  name={muted ? 'musical-notes-outline' : 'musical-notes-outline'}
                   size={24}
                   color={palette.brandGreen}
                 />
-                <Text style={styles.rowLabel}>{muted ? 'Activer le son' : 'Couper le son'}</Text>
+                <Text style={styles.rowLabel}>Effets sonores</Text>
               </View>
               <View style={[styles.toggle, muted && styles.toggleOff]}>
                 <View style={[styles.toggleThumb, muted && styles.toggleThumbOff]} />
+              </View>
+            </Pressable>
+
+            <View style={styles.divider} />
+
+            <Pressable
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+              onPress={() => setMusicMuted(!musicMuted)}
+              accessibilityRole="switch"
+              accessibilityLabel={musicMuted ? 'Activer la musique' : 'Couper la musique'}
+            >
+              <View style={styles.rowLeft}>
+                <Ionicons
+                  name={musicMuted ? 'volume-mute-outline' : 'volume-high-outline'}
+                  size={24}
+                  color={palette.brandGreen}
+                />
+                <Text style={styles.rowLabel}>Musique</Text>
+              </View>
+              <View style={[styles.toggle, musicMuted && styles.toggleOff]}>
+                <View style={[styles.toggleThumb, musicMuted && styles.toggleThumbOff]} />
               </View>
             </Pressable>
 
@@ -184,9 +214,8 @@ export function GameMenu({ visible, onClose, isHost, roundCount, onRoundCountCha
             </Pressable>
 
             <View style={styles.handle} />
-            </View>
           </Pressable>
-        </View>
+        </Pressable>
       </Modal>
     </>
   );

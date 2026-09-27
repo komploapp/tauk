@@ -1,0 +1,34 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_1_7917)">
+<rect width="128" height="128" rx="64" fill="white"/>
+<g clip-path="url(#clip1_1_7917)">
+<mask id="mask0_1_7917" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-64" y="0" width="256" height="128">
+<path d="M-64 0V128H192V0H-64Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_1_7917)">
+<path d="M-64 0V128H192V0H-64Z" fill="#012169"/>
+<path d="M-64 0L192 128L-64 0ZM192 0L-64 128L192 0Z" fill="black"/>
+<path d="M-64 0L192 128M192 0L-64 128" stroke="white" stroke-width="25.6"/>
+<mask id="mask1_1_7917" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-64" y="0" width="256" height="128">
+<path d="M64 64H192V128L64 64ZM64 64V128H-64L64 64ZM64 64H-64V0L64 64ZM64 64V0H192L64 64Z" fill="white"/>
+</mask>
+<g mask="url(#mask1_1_7917)">
+<path d="M-64 0L192 128L-64 0ZM192 0L-64 128L192 0Z" fill="black"/>
+<path d="M-64 0L192 128M192 0L-64 128" stroke="#C8102E" stroke-width="17.0667"/>
+</g>
+<path d="M64 0V128V0ZM-64 64H192H-64Z" fill="black"/>
+<path d="M64 0V128M-64 64H192" stroke="white" stroke-width="42.6667"/>
+<path d="M64 0V128V0ZM-64 64H192H-64Z" fill="black"/>
+<path d="M64 0V128M-64 64H192" stroke="#C8102E" stroke-width="25.6"/>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_1_7917">
+<rect width="128" height="128" rx="64" fill="white"/>
+</clipPath>
+<clipPath id="clip1_1_7917">
+<rect width="256" height="128" fill="white" transform="translate(-64)"/>
+</clipPath>
+</defs>
+</svg>

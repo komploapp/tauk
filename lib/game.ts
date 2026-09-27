@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Game, Player, Round, PlayerTask, Character } from '@/store';
+import type { Game, Player, Round, PlayerTask, Character, Accusation } from '@/store';
 
 // ─── Génération device ID ──────────────────────────────────────────────────────
 
@@ -32,12 +32,14 @@ export async function createGame(
   pseudo: string,
   character: Character,
   taskCount = 7,
+  roundCount = 3,
+  roundDurationS: number | null = null,
 ): Promise<{ game: Game; player: Player }> {
   const code = await generateUniqueCode();
 
   const { data: game, error: gameErr } = await supabase
     .from('games')
-    .insert({ code, mode: 'taches', status: 'lobby', task_count: taskCount })
+    .insert({ code, mode: 'taches', status: 'lobby', task_count: taskCount, round_count: roundCount, round_duration_s: roundDurationS })
     .select()
     .single();
 
@@ -101,6 +103,48 @@ export async function setPlayerReady(playerId: string, ready: boolean): Promise<
   await supabase.from('players').update({ is_ready: ready }).eq('id', playerId);
 }
 
+// ─── Modifier le pseudo en lobby ──────────────────────────────────────────────
+
+export async function updatePlayerPseudo(playerId: string, pseudo: string): Promise<void> {
+  const { error } = await supabase.from('players').update({ pseudo }).eq('id', playerId);
+  if (error) throw new Error(error.message);
+}
+
+// ─── Modifier le nombre de manches ───────────────────────────────────────────
+
+export async function updateRoundCount(gameId: string, roundCount: 3 | 6 | 10): Promise<void> {
+  const { error } = await supabase.from('games').update({ round_count: roundCount }).eq('id', gameId);
+  if (error) throw new Error(error.message);
+}
+
+// ─── Modifier la durée du timer ───────────────────────────────────────────────
+
+export async function updateRoundDurationS(gameId: string, durationS: number | null): Promise<void> {
+  const { error } = await supabase.from('games').update({ round_duration_s: durationS }).eq('id', gameId);
+  if (error) throw new Error(error.message);
+}
+
+// ─── Expulser un joueur du lobby ──────────────────────────────────────────────
+
+export async function kickPlayer(playerId: string): Promise<void> {
+  const { error } = await supabase.from('players').delete().eq('id', playerId);
+  if (error) throw new Error(error.message);
+}
+
+// ─── Transférer les privilèges d'hôte ────────────────────────────────────────
+
+export async function transferHost(
+  gameId: string,
+  newHostId: string,
+  oldHostId: string,
+): Promise<void> {
+  await Promise.all([
+    supabase.from('games').update({ host_id: newHostId }).eq('id', gameId),
+    supabase.from('players').update({ is_host: true }).eq('id', newHostId),
+    supabase.from('players').update({ is_host: false }).eq('id', oldHostId),
+  ]);
+}
+
 // ─── Lancer la partie (host) ──────────────────────────────────────────────────
 
 export async function startGame(gameId: string): Promise<Round> {
@@ -110,10 +154,13 @@ export async function startGame(gameId: string): Promise<Round> {
 
 // ─── Créer un nouveau round ───────────────────────────────────────────────────
 
+// Must match COUNTDOWN_START in prepa.tsx so the round timer starts at durationS on the game screen.
+const ROUND_PREP_DELAY_S = 10;
+
 export async function createRound(gameId: string, roundNumber: number): Promise<Round> {
   const { data: round, error } = await supabase
     .from('rounds')
-    .insert({ game_id: gameId, round_number: roundNumber, status: 'playing' })
+    .insert({ game_id: gameId, round_number: roundNumber, status: 'playing', started_at: new Date(Date.now() + ROUND_PREP_DELAY_S * 1000).toISOString() })
     .select()
     .single();
 
@@ -190,6 +237,10 @@ export async function createAccusation(
     .single();
 
   if (error || !data) throw new Error(error?.message ?? 'Erreur TAUK!');
+
+  // Marque la pause côté serveur (timestamp Postgres — aucun biais d'horloge client)
+  await supabase.rpc('start_round_pause', { p_round_id: roundId });
+
   return data.id;
 }
 
@@ -205,35 +256,70 @@ export async function resolveAccusation(
     .update({ result, player_task_id: playerTaskId ?? null })
     .eq('id', accusationId);
 
+  const { data: acc } = await supabase
+    .from('accusations')
+    .select('accuser_id, accused_id')
+    .eq('id', accusationId)
+    .single();
+
   if (result === 'confirmed') {
-    // Accusateur gagne +1 point
-    const { data: acc } = await supabase
-      .from('accusations')
-      .select('accuser_id')
-      .eq('id', accusationId)
-      .single();
-
     if (acc?.accuser_id) {
-      await supabase.rpc('increment_player_score', {
-        p_player_id: acc.accuser_id,
-        p_delta: 1,
-      });
+      await supabase.rpc('increment_player_score', { p_player_id: acc.accuser_id, p_delta: 1 });
     }
-
-    // Marque la tâche comme grillée si sélectionnée
     if (playerTaskId) {
-      const { data: acc2 } = await supabase
-        .from('accusations')
-        .select('accuser_id')
-        .eq('id', accusationId)
-        .single();
-
       await supabase
         .from('player_tasks')
-        .update({ status: 'grilled', grilled_by: acc2?.accuser_id })
+        .update({ status: 'grilled', grilled_by: acc?.accuser_id })
         .eq('id', playerTaskId);
     }
+  } else {
+    // Accusé à tort → l'accusé gagne +1
+    if (acc?.accused_id) {
+      await supabase.rpc('increment_player_score', { p_player_id: acc.accused_id, p_delta: 1 });
+    }
   }
+}
+
+// ─── Annuler une accusation (l'accusateur fait machine arrière) ───────────────
+
+export async function cancelAccusation(accusationId: string): Promise<void> {
+  await supabase.from('accusations').update({ result: 'cancelled' }).eq('id', accusationId);
+  await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: accusationId });
+}
+
+// ─── Charger les résultats d'un round (toutes tâches + accusations) ──────────
+
+export async function loadRoundResults(roundId: string): Promise<{
+  tasksByPlayer: Record<string, PlayerTask[]>;
+  accusations: Accusation[];
+}> {
+  const [tasksRes, accRes] = await Promise.all([
+    supabase.from('player_tasks').select('*, tasks(text)').eq('round_id', roundId),
+    supabase.from('accusations').select('*').eq('round_id', roundId),
+  ]);
+
+  const tasks: PlayerTask[] = (tasksRes.data ?? []).map((row) => ({
+    ...row,
+    task_text: (row.tasks as { text: string } | null)?.text ?? '',
+  }));
+
+  const tasksByPlayer: Record<string, PlayerTask[]> = {};
+  for (const t of tasks) {
+    if (!tasksByPlayer[t.player_id]) tasksByPlayer[t.player_id] = [];
+    tasksByPlayer[t.player_id].push(t);
+  }
+
+  return { tasksByPlayer, accusations: (accRes.data ?? []) as Accusation[] };
+}
+
+// ─── Notifier les autres joueurs d'un départ ──────────────────────────────────
+
+export function broadcastPlayerLeft(gameId: string, playerId: string): void {
+  supabase.channel(`lobby-${gameId}`).send({
+    type: 'broadcast',
+    event: 'player_left',
+    payload: { playerId },
+  }).catch(() => {});
 }
 
 // ─── Charger tous les joueurs d'une partie ────────────────────────────────────

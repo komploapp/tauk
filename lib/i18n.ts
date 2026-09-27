@@ -20,7 +20,7 @@ const translations: Record<Lang, Strings> = {
     tagline: 'Cuisine tes amis sans passer à la casserole !',
     startGame: 'Dresser une table',
     join: 'Rejoindre',
-    modeSection: 'On cuisine quoi ce soir ?',
+    modeSection: 'On cuisine quoi ?',
     comingSoon: 'bientôt au menu !',
     createGame: 'Créer la partie',
     pseudoTitle: 'Ton pseudo',

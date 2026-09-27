@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { ToqueBackground } from '@/components/ToqueBackground';
 import { palette, spacing, radius } from '@/constants/palette';
 import { joinGame, getOrCreateDeviceId } from '@/lib/game';
 import { useStore } from '@/store';
 
 export default function JoinScreen() {
-  const [code, setCode] = useState('');
+  const params = useLocalSearchParams<{ code?: string }>();
+  const [code, setCode] = useState(params.code?.toUpperCase().slice(0, 4) ?? '');
   const [pseudo, setPseudo] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,14 +45,24 @@ export default function JoinScreen() {
       <ToqueBackground />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-        >
-          <Text style={styles.backBtnText}>{'<'}</Text>
-        </Pressable>
+        <View style={styles.topBar}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+          >
+            <Text style={styles.backBtnText}>{'<'}</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.settingsBtn, pressed && styles.pressed]}
+            onPress={() => {}}
+            accessibilityRole="button"
+            accessibilityLabel="Paramètres"
+          >
+            <Ionicons name="settings-outline" size={28} color={palette.brandPink} />
+          </Pressable>
+        </View>
 
         <View style={styles.content}>
           <Text style={styles.title}>Rejoindre</Text>
@@ -125,15 +137,21 @@ const styles = StyleSheet.create({
     flex: 1,
     zIndex: 1,
   },
-  backBtn: {
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.medium,
     paddingTop: spacing.small,
+    paddingBottom: 4,
   },
+  backBtn: { padding: 4 },
   backBtnText: {
     fontFamily: 'Recursive_600SemiBold',
     fontSize: 22,
     color: palette.brandPink,
   },
+  settingsBtn: { padding: 4 },
   content: {
     flex: 1,
     paddingHorizontal: 26,

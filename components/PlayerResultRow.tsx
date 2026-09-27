@@ -21,7 +21,7 @@ export type PlayerResult = {
   avatarBg: string;
   Character: SvgComponent;
   rankBadge: number;
-  bonus?: { text: string; value: number };
+  bonus?: { text: string; value: number }[];
   challenges?: ChallengeResult[];
 };
 
@@ -78,7 +78,7 @@ function ChallengeRow({ challenge }: { challenge: ChallengeResult }) {
 export function PlayerResultRow({ player }: { player: PlayerResult }) {
   const [expanded, setExpanded] = useState(false);
   const { Character } = player;
-  const hasDetails = !!(player.bonus || player.challenges?.length);
+  const hasDetails = !!(player.bonus?.length || player.challenges?.length);
   const scoreDeltaLabel = player.scoreDelta > 0 ? `+${player.scoreDelta}` : String(player.scoreDelta);
 
   return (
@@ -117,9 +117,9 @@ export function PlayerResultRow({ player }: { player: PlayerResult }) {
       {/* ── Expanded detail rows ── */}
       {expanded && (
         <View>
-          {player.bonus && (
-            <BonusRow text={player.bonus.text} value={player.bonus.value} />
-          )}
+          {player.bonus?.map((b) => (
+            <BonusRow key={b.text} text={b.text} value={b.value} />
+          ))}
           {player.challenges?.map((c) => (
             <ChallengeRow key={c.id} challenge={c} />
           ))}

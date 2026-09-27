@@ -1,22 +1,20 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { GameMenu } from '@/components/GameMenu';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { palette } from '@/constants/palette';
+import { useStore } from '@/store';
+import type { PlayerTask, ValidatingEntry } from '@/store';
 
-type Challenge = {
-  id: string;
-  text: string;
-  done: boolean;
-};
+const VALIDATION_MS = 10_000;
 
-const DEMO_CHALLENGES: Challenge[] = [
-  { id: '1', text: 'Voici une liste de défis amusants pour pimenter vos soirées entre amis.', done: false },
-  { id: '2', text: 'Voici une liste de défis amusants pour pimenter vos soirées entre amis.', done: false },
-  { id: '3', text: 'Voici une liste de défis amusants pour pimenter vos soirées entre amis.', done: true },
-  { id: '4', text: 'Voici une liste de défis amusants pour pimenter vos soirées entre amis.', done: true },
-  { id: '5', text: 'Voici une liste de défis amusants pour pimenter vos soirées entre amis.', done: true },
-  { id: '6', text: 'Voici une liste de défis amusants pour pimenter vos soirées entre amis.', done: false },
-];
+type TaskState = 'pending' | 'validating' | 'done';
+
+function frozenProgress(entry: ValidatingEntry): number {
+  if (!entry.frozenAt) return 0;
+  return Math.min(1, (entry.frozenAt - entry.startedAt) / VALIDATION_MS);
+}
 
 function Bullet({ active }: { active: boolean }) {
   return (
@@ -35,48 +33,91 @@ function Bullet({ active }: { active: boolean }) {
   );
 }
 
-interface ChallengeRowProps {
-  challenge: Challenge;
+interface TaskRowProps {
+  task: PlayerTask;
+  state: TaskState;
   selected: boolean;
+  frozenProgress?: number; // 0–1 ratio of fill progress when frozen
   onPress: () => void;
 }
 
-function ChallengeRow({ challenge, selected, onPress }: ChallengeRowProps) {
+function TaskRow({ task, state, selected, frozenProgress, onPress }: TaskRowProps) {
+  const isDone = state === 'done';
+  const isValidating = state === 'validating';
+
   return (
     <Pressable
       style={[
         styles.row,
         selected && styles.rowSelected,
+        isValidating && !selected && styles.rowValidating,
+        isDone && styles.rowDone,
       ]}
       onPress={onPress}
-      disabled={challenge.done}
+      disabled={isDone}
       accessibilityRole="radio"
-      accessibilityState={{ selected, disabled: challenge.done }}
+      accessibilityState={{ selected, disabled: isDone }}
     >
+      {/* Frozen fill anchored to right */}
+      {isValidating && !selected && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {frozenProgress !== undefined && frozenProgress > 0 ? (
+            <View
+              style={[
+                styles.validatingFill,
+                { position: 'absolute', right: 0, top: 0, bottom: 0, left: `${(1 - frozenProgress) * 100}%` },
+              ]}
+            />
+          ) : (
+            <View style={styles.validatingFill} />
+          )}
+        </View>
+      )}
+
       <Bullet active={selected} />
-      <Text style={[
-        styles.rowText,
-        selected && styles.rowTextSelected,
-        challenge.done && styles.rowTextDone,
-      ]}>
-        {challenge.text}
-      </Text>
+
+      <View style={styles.rowContent}>
+        <Text
+          style={[
+            styles.rowText,
+            selected && styles.rowTextSelected,
+            isDone && styles.rowTextDone,
+          ]}
+          numberOfLines={3}
+        >
+          {task.task_text}
+        </Text>
+      </View>
     </Pressable>
+  );
+}
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <View style={styles.sectionLabel}>
+      <Text style={styles.sectionLabelText}>{label}</Text>
+    </View>
   );
 }
 
 interface ChallengeOverlayProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (challengeId: string) => void;
+  onConfirm: (playerTaskId: string) => void;
 }
 
 export function ChallengeOverlay({ visible, onClose, onConfirm }: ChallengeOverlayProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const { myTasks, validatingTasks } = useStore();
 
   function handleShow() {
     setSelectedId(null);
   }
+
+  const pendingTasks      = myTasks.filter((t) => t.status === 'pending' && !validatingTasks.some((e) => e.id === t.id));
+  const validatingTaskList = myTasks.filter((t) => t.status === 'pending' &&  validatingTasks.some((e) => e.id === t.id));
+  const doneTasks          = myTasks.filter((t) => t.status !== 'pending');
 
   return (
     <Modal
@@ -86,6 +127,7 @@ export function ChallengeOverlay({ visible, onClose, onConfirm }: ChallengeOverl
       animationType="slide"
       onShow={handleShow}
     >
+      <GameMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
       <View style={styles.sheet}>
         <SafeAreaView style={styles.inner} edges={['top', 'bottom']}>
 
@@ -93,38 +135,83 @@ export function ChallengeOverlay({ visible, onClose, onConfirm }: ChallengeOverl
           <View style={styles.header}>
             <Pressable
               onPress={onClose}
-              style={styles.backBtn}
+              style={styles.iconBtn}
               accessibilityRole="button"
               accessibilityLabel="Fermer"
             >
-              <Text style={styles.backBtnText}>{'<'}</Text>
+              <Ionicons name="close" size={22} color={palette.brandPink} />
             </Pressable>
-            <View style={styles.settingsBtn}>
-              <Text style={styles.settingsBtnText}>⚙</Text>
-            </View>
+            <Pressable
+              onPress={() => setMenuVisible(true)}
+              style={styles.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Paramètres"
+            >
+              <Ionicons name="settings-outline" size={20} color={palette.brandPink} />
+            </Pressable>
           </View>
 
           {/* ── Titre ── */}
           <Text style={styles.title}>Sur quel défi ?</Text>
 
-          {/* ── Liste des défis (scrollable, prend l'espace restant) ── */}
+          {/* ── Liste (scrollable) ── */}
           <ScrollView
             style={styles.listScroll}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            {DEMO_CHALLENGES.map((challenge) => (
-              <ChallengeRow
-                key={challenge.id}
-                challenge={challenge}
-                selected={selectedId === challenge.id}
-                onPress={() => setSelectedId(challenge.id)}
-              />
-            ))}
+            {validatingTaskList.length > 0 && (
+              <>
+                <SectionLabel label="En cours de validation" />
+                {validatingTaskList.map((task) => {
+                  const entry = validatingTasks.find((e) => e.id === task.id);
+                  return (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      state="validating"
+                      selected={selectedId === task.id}
+                      frozenProgress={entry ? frozenProgress(entry) : 0}
+                      onPress={() => setSelectedId(task.id)}
+                    />
+                  );
+                })}
+              </>
+            )}
+
+            {pendingTasks.length > 0 && (
+              <>
+                {validatingTaskList.length > 0 && <SectionLabel label="À faire" />}
+                {pendingTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    state="pending"
+                    selected={selectedId === task.id}
+                    onPress={() => setSelectedId(task.id)}
+                  />
+                ))}
+              </>
+            )}
+
+            {doneTasks.length > 0 && (
+              <>
+                <SectionLabel label="Actions réalisées" />
+                {doneTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    state="done"
+                    selected={false}
+                    onPress={() => {}}
+                  />
+                ))}
+              </>
+            )}
           </ScrollView>
 
-          {/* ── Bouton confirmer — toujours visible en bas ── */}
+          {/* ── Confirmer ── */}
           <Pressable
             style={({ pressed }) => [
               styles.confirmBtn,
@@ -164,31 +251,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  backBtn: {
+  iconBtn: {
     width: 32,
     height: 32,
     borderRadius: 60,
     backgroundColor: 'rgba(255, 20, 134, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backBtnText: {
-    fontFamily: 'Recursive_600SemiBold',
-    fontSize: 16,
-    color: palette.brandPink,
-    lineHeight: 20,
-  },
-  settingsBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 20, 134, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  settingsBtnText: {
-    fontSize: 16,
-    color: palette.brandPink,
   },
 
   // ─── Titre ────────────────────────────────────────────────────────────────
@@ -200,8 +269,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ─── Liste des défis ──────────────────────────────────────────────────────
-  // flex: 1 → absorbe l'espace restant entre le titre et le bouton
+  // ─── Liste ────────────────────────────────────────────────────────────────
   listScroll: {
     flex: 1,
     borderRadius: 24,
@@ -210,23 +278,51 @@ const styles = StyleSheet.create({
   listContent: {
     backgroundColor: '#ffffff',
   },
+
+  // ─── Section label ────────────────────────────────────────────────────────
+  sectionLabel: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: '#ffffff',
+  },
+  sectionLabelText: {
+    fontFamily: 'Recursive_600SemiBold',
+    fontSize: 11,
+    color: palette.brandPink,
+    opacity: 0.5,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+
+  // ─── Row ──────────────────────────────────────────────────────────────────
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 24,
     paddingHorizontal: 16,
-    paddingVertical: 28,
+    paddingVertical: 24,
     borderBottomWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: '#ffdac7',
     backgroundColor: 'rgba(255, 251, 250, 0.9)',
+    overflow: 'hidden',
   },
   rowSelected: {
     backgroundColor: palette.brandPink,
   },
-  rowText: {
+  rowValidating: {
+    backgroundColor: 'transparent',
+  },
+  rowDone: {
+    opacity: 0.45,
+  },
+  rowContent: {
     flex: 1,
+    gap: 4,
+  },
+  rowText: {
     fontFamily: 'Recursive_400Regular',
     fontSize: 16,
     color: palette.textPrimary,
@@ -236,6 +332,18 @@ const styles = StyleSheet.create({
   },
   rowTextDone: {
     textDecorationLine: 'line-through',
+  },
+
+  // ─── Validating fill (static #FFEBEF) ─────────────────────────────────────
+  validatingFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFEBEF',
+  },
+  validatingLabel: {
+    fontFamily: 'Recursive_400Regular',
+    fontSize: 11,
+    color: palette.brandPink,
+    opacity: 0.6,
   },
 
   // ─── Bullet ───────────────────────────────────────────────────────────────
@@ -259,7 +367,7 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
 
-  // ─── Bouton confirmer ─────────────────────────────────────────────────────
+  // ─── Confirmer ────────────────────────────────────────────────────────────
   confirmBtn: {
     width: 340,
     alignSelf: 'center',

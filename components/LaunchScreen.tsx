@@ -17,7 +17,7 @@ const LOGO_DURATION   = 850;
 const CIRCLE_DELAY    = LOGO_DELAY + LOGO_DURATION + 1;         // 1251
 const CIRCLE_DURATION = 220;
 const DISSOLVE_DELAY    = CIRCLE_DELAY + CIRCLE_DURATION + 140; // 1611
-const DISSOLVE_DURATION = 1000;
+const DISSOLVE_DURATION = 350;
 
 interface Props { onDone: () => void }
 

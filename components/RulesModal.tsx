@@ -1,36 +1,37 @@
-import { Modal, View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette, spacing, radius } from '@/constants/palette';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  onShowTutorial: () => void;
 }
 
-const RULES = [
+const MODES = [
   {
-    title: '🎯 But du jeu',
-    body: "Accomplis tes tâches secrètes sans te faire démasquer, et accuse les autres avant qu'ils t'éliminent.",
+    key: 'fourneaux',
+    label: 'Fourneaux',
+    description: 'Réalisez vos défis secrets en cachette et piégez vos convives !',
+    active: true,
   },
   {
-    title: '📋 Chaque service',
-    body: "Chaque joueur reçoit des tâches à réaliser discrètement pendant la partie. Accomplis-les sans attirer l'attention.",
+    key: 'carnage',
+    label: 'Carnage',
+    description: "Garde un œil sur ta proie sans finir toi-même sur le gril !",
+    active: false,
   },
   {
-    title: '🕵️ Accuser',
-    body: "Si tu soupçonnes quelqu'un d'avoir accompli une tâche, glisse sa carte vers le bas pour l'accuser. Attention, une mauvaise accusation te coûte des points !",
+    key: 'binomes',
+    label: 'Binomes',
+    description: 'Repère ton complice et taukez en même temps !',
+    active: false,
   },
-  {
-    title: '✅ Valider une tâche',
-    body: "Maintiens ton doigt sur une tâche pour la marquer comme accomplie. Les autres joueurs verront que quelqu'un l'a faite — à toi de rester discret.",
-  },
-  {
-    title: '🏆 Score',
-    body: 'Tu gagnes des points pour chaque tâche accomplie et chaque accusation réussie. Le joueur avec le plus de points à la fin remporte la partie.',
-  },
-];
+] as const;
 
-export function RulesModal({ visible, onClose }: Props) {
+export function RulesModal({ visible, onClose, onShowTutorial }: Props) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       visible={visible}
@@ -39,36 +40,48 @@ export function RulesModal({ visible, onClose }: Props) {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={{ flex: 1 }}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.58)' }} onPress={onClose} accessible={false}>
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-          <BlurView style={StyleSheet.absoluteFillObject} intensity={20} tint="dark" />
+          <BlurView style={StyleSheet.absoluteFillObject} intensity={50} tint="dark" />
         </View>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <Pressable style={[styles.sheet, { paddingTop: insets.top + spacing.medium }]} onPress={() => {}}>
           <Text style={styles.title}>Règles du jeu</Text>
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {RULES.map((rule) => (
-              <View key={rule.title} style={styles.rule}>
-                <Text style={styles.ruleTitle}>{rule.title}</Text>
-                <Text style={styles.ruleBody}>{rule.body}</Text>
-              </View>
+          <View style={styles.modeList}>
+            {MODES.map((mode) => (
+              <Pressable
+                key={mode.key}
+                style={({ pressed }) => [
+                  styles.modeCard,
+                  !mode.active && styles.modeCardDimmed,
+                  mode.active && pressed && styles.pressed,
+                ]}
+                onPress={mode.active ? onShowTutorial : undefined}
+                accessibilityRole={mode.active ? 'button' : 'none'}
+                accessibilityLabel={mode.active ? `Mode ${mode.label} — voir le tutoriel` : mode.label}
+              >
+                <Text style={[styles.modeLabel, !mode.active && styles.modeLabelDimmed]}>
+                  {mode.label}
+                </Text>
+                <Text style={[styles.modeDesc, !mode.active && styles.modeDescDimmed]}>
+                  {mode.description}
+                </Text>
+                {!mode.active && (
+                  <Text style={styles.comingSoon}>bientôt au menu !</Text>
+                )}
+              </Pressable>
             ))}
-          </ScrollView>
+          </View>
           <Pressable
             style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Fermer les règles"
+            accessibilityLabel="Fermer"
           >
-            <Text style={styles.closeBtnText}>Compris !</Text>
+            <Text style={styles.closeBtnText}>Fermer</Text>
           </Pressable>
-        </View>
-      </View>
+          <View style={styles.handle} />
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -76,15 +89,14 @@ export function RulesModal({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   sheet: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
     backgroundColor: palette.bgWhite,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     paddingHorizontal: spacing.medium,
-    paddingBottom: 36,
-    maxHeight: '80%',
+    paddingBottom: 24,
   },
   handle: {
     width: 40,
@@ -92,8 +104,8 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: palette.borderPeach,
     alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 16,
+    marginTop: 20,
+    marginBottom: 8,
   },
   title: {
     fontFamily: 'Staatliches_400Regular',
@@ -103,22 +115,44 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     marginBottom: 16,
   },
-  scroll: { flexGrow: 0 },
-  scrollContent: { gap: 20, paddingBottom: 8 },
-  rule: { gap: 6 },
-  ruleTitle: {
-    fontFamily: 'Recursive_600SemiBold',
-    fontSize: 16,
-    color: palette.brandGreen,
+  modeList: {
+    gap: 12,
   },
-  ruleBody: {
-    fontFamily: 'Recursive_400Regular',
-    fontSize: 15,
-    lineHeight: 22,
+  modeCard: {
+    backgroundColor: palette.highlightInner,
+    borderRadius: radius.main,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 4,
+  },
+  modeCardDimmed: {
+    opacity: 0.4,
+  },
+  modeLabel: {
+    fontFamily: 'Staatliches_400Regular',
+    fontSize: 28,
+    lineHeight: 30,
+    color: palette.brandPink,
+    textTransform: 'uppercase',
+  },
+  modeLabelDimmed: {
     color: palette.textPrimary,
   },
+  modeDesc: {
+    fontFamily: 'Recursive_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+    color: palette.textPrimary,
+  },
+  modeDescDimmed: {},
+  comingSoon: {
+    fontFamily: 'Recursive_600SemiBold',
+    fontSize: 11,
+    color: palette.brandGreen,
+    marginTop: 2,
+  },
   closeBtn: {
-    marginTop: 24,
+    marginTop: 20,
     backgroundColor: palette.brandGreen,
     borderRadius: radius.main,
     paddingVertical: spacing.xsmall,

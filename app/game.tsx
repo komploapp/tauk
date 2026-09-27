@@ -22,6 +22,7 @@ import { PlayerLeftModal } from '@/components/PlayerLeftModal';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store';
 import type { PlayerTask, Accusation } from '@/store';
+import { playSound } from '@/lib/sound';
 import { useRoundTimer } from '@/hooks/useRoundTimer';
 
 const ITEM_HEIGHT   = 76;
@@ -609,6 +610,7 @@ export default function GameScreen() {
   function handleValidationComplete(task: PlayerTask) {
     removeValidatingTask(task.id);
     if (!currentRound?.id || !myPlayer?.id) return;
+    playSound('attributionPoint');
     updateTaskStatus(task.id, 'done');
     markTaskDone(task.id, currentRound.id, myPlayer.id);
   }
@@ -697,7 +699,7 @@ export default function GameScreen() {
                 {timerDisplay}
               </Text>
             )}
-            <Pressable onPress={() => setMenuVisible(true)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Options">
+            <Pressable onPress={() => { playSound('uiPress'); setMenuVisible(true); }} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Options">
               <Ionicons name="settings-outline" size={22} color={palette.brandPink} />
             </Pressable>
           </View>

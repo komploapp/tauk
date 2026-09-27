@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, PanResponder, ScrollView, Easing, Pressable, Alert } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,8 +11,11 @@ import { palette, spacing, radius } from '@/constants/palette';
 import { loadMyTasks, kickPlayer, broadcastPlayerLeft } from '@/lib/game';
 import { usePlayerLeft } from '@/hooks/usePlayerLeft';
 import { PlayerLeftModal } from '@/components/PlayerLeftModal';
+import { TutorialModal } from '@/components/TutorialModal';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store';
+import { stopThemeMusic } from '@/lib/themeMusic';
+import { playSound } from '@/lib/sound';
 import type { PlayerTask } from '@/store';
 
 const COUNTDOWN_START = 10;
@@ -246,17 +250,33 @@ function PrepToast({ toastKey, tapY }: { toastKey: number; tapY: number }) {
 
 export default function PrepaScreen() {
   const { game, currentRound, myPlayer, setMyTasks, reset } = useStore();
+
+  useEffect(() => { stopThemeMusic(); }, []);
   const { leftPlayer, isGameOver, dismissPlayerLeft } = usePlayerLeft();
   const [localTasks,    setLocalTasks]    = useState<PlayerTask[]>([]);
   const [countdown,     setCountdown]     = useState(COUNTDOWN_START);
   const [isDragging,    setIsDragging]    = useState(false);
   const [dragFrom,      setDragFrom]      = useState(-1);
   const [dragInsertIdx, setDragInsertIdx] = useState(-1);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [toastKey,    setToastKey]    = useState(0);
-  const [toastTapY,   setToastTapY]   = useState(200);
+  const [menuVisible,     setMenuVisible]     = useState(false);
+  const [tutorialVisible, setTutorialVisible] = useState(false);
+  const [toastKey,        setToastKey]        = useState(0);
+  const [toastTapY,       setToastTapY]       = useState(200);
 
-  function showToast(y: number) { setToastTapY(y); setToastKey((k) => k + 1); }
+  function showToast(y: number) { playSound('taskCannotComplete'); setToastTapY(y); setToastKey((k) => k + 1); }
+
+  const TUTORIAL_FLAG = `${FileSystem.documentDirectory}tutorial_fourneaux_seen`;
+
+  useEffect(() => {
+    FileSystem.getInfoAsync(TUTORIAL_FLAG).then((info) => {
+      if (!info.exists) setTutorialVisible(true);
+    }).catch(() => { setTutorialVisible(true); });
+  }, []);
+
+  function handleTutorialClose() {
+    setTutorialVisible(false);
+    FileSystem.writeAsStringAsync(TUTORIAL_FLAG, '1').catch(() => {});
+  }
 
   function handleQuit() {
     Alert.alert(
@@ -350,6 +370,7 @@ export default function PrepaScreen() {
       <ToqueBackground />
       <GameMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
       <PlayerLeftModal player={leftPlayer} isGameOver={isGameOver} onDismiss={dismissPlayerLeft} />
+      <TutorialModal visible={tutorialVisible} onClose={handleTutorialClose} />
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.topBar}>
           <Pressable

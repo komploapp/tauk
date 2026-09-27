@@ -13,6 +13,7 @@ create table if not exists games (
   status      text not null default 'lobby', -- lobby | playing | finished
   host_id     uuid,                       -- référence players.id, set après création
   task_count  integer not null default 7, -- nb de tâches par joueur
+  round_count integer not null default 3 check (round_count in (3, 6, 10)),
   created_at  timestamptz default now()
 );
 
@@ -214,3 +215,10 @@ alter publication supabase_realtime add table players;
 alter publication supabase_realtime add table rounds;
 alter publication supabase_realtime add table player_tasks;
 alter publication supabase_realtime add table accusations;
+
+-- REPLICA IDENTITY FULL : nécessaire pour que les filtres Realtime
+-- sur les UPDATE fonctionnent (par défaut seule la PK est dans le WAL)
+alter table players      replica identity full;
+alter table games        replica identity full;
+alter table rounds       replica identity full;
+ 

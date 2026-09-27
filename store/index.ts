@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Lang } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,7 +12,7 @@ export type GameMode = 'taches';
 export type GameStatus = 'lobby' | 'playing' | 'finished';
 export type RoundStatus = 'playing' | 'countdown' | 'finished';
 export type TaskStatus = 'pending' | 'done' | 'missed' | 'grilled';
-export type AccusationResult = 'confirmed' | 'denied' | 'pending';
+export type AccusationResult = 'confirmed' | 'denied' | 'pending' | 'cancelled';
 
 export interface Player {
   id: string;
@@ -42,6 +43,8 @@ export interface Game {
   status: GameStatus;
   host_id: string;
   task_count: number;
+  round_count: number;
+  round_duration_s: number | null;
 }
 
 export interface Round {
@@ -50,7 +53,10 @@ export interface Round {
   round_number: number;
   status: RoundStatus;
   winner_id?: string;
+  started_at?: string;
   countdown_started_at?: string;
+  total_paused_ms?: number;
+  paused_since?: string | null;
 }
 
 export interface Accusation {
@@ -62,9 +68,19 @@ export interface Accusation {
   result: AccusationResult;
 }
 
+// Entrée pour chaque tâche en cours de validation (fenêtre de 10 s)
+export interface ValidatingEntry {
+  id: string;
+  startedAt: number;       // Date.now() quand la tâche est entrée en validation
+  frozenAt: number | null; // Date.now() quand TAUK a gelé le compteur (null = pas encore gelé)
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
 interface AppState {
+  // Langue sélectionnée
+  lang: Lang;
+
   // Identité de ce device
   deviceId: string | null;
   myPlayer: Player | null;
@@ -73,10 +89,23 @@ interface AppState {
   game: Game | null;
   players: Player[];
   currentRound: Round | null;
-  myTasks: PlayerTask[];          // tâches secrètes de ce joueur
+  myTasks: PlayerTask[];
   activeAccusation: Accusation | null;
+  buzzer: Player | null;
+  validatingTasks: ValidatingEntry[]; // tâches dans la fenêtre de 10 s, avec timestamps
+  taukActive: boolean;                // TAUK pressé — gèle les compteurs
+  taukFiredAt: number | null;         // timestamp ms au moment du TAUK (pour geler le timer global)
+  leftPlayerIds: string[];            // IDs des joueurs qui ont quitté la session
+  leftPlayers: Player[];             // Objets complets des joueurs partis (pour affichage résultats)
+
+  // Préférences
+  muted: boolean;
+  musicMuted: boolean;
 
   // Actions
+  setLang: (lang: Lang) => void;
+  setMuted: (muted: boolean) => void;
+  setMusicMuted: (v: boolean) => void;
   setDeviceId: (id: string) => void;
   setMyPlayer: (player: Player) => void;
   setGame: (game: Game) => void;
@@ -86,12 +115,25 @@ interface AppState {
   setMyTasks: (tasks: PlayerTask[]) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
   setActiveAccusation: (accusation: Accusation | null) => void;
+  setBuzzer: (player: Player | null) => void;
+  addValidatingTask: (id: string) => void;
+  removeValidatingTask: (id: string) => void;
+  clearValidatingTasks: () => void;
+  addLeftPlayerId: (id: string) => void;
+  addLeftPlayer: (player: Player) => void;
+  // Active le gel : enregistre frozenAt sur toutes les entrées + passe taukActive à true
+  activateTauk: () => void;
+  // Désactive le gel sans effacer frozenAt (pour la reprise)
+  deactivateTauk: () => void;
   reset: () => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 const INITIAL: Omit<AppState, keyof ReturnType<typeof actions>> = {
+  lang: 'fr',
+  muted: false,
+  musicMuted: false,
   deviceId: null,
   myPlayer: null,
   game: null,
@@ -99,10 +141,19 @@ const INITIAL: Omit<AppState, keyof ReturnType<typeof actions>> = {
   currentRound: null,
   myTasks: [],
   activeAccusation: null,
+  buzzer: null,
+  validatingTasks: [],
+  taukActive: false,
+  taukFiredAt: null,
+  leftPlayerIds: [],
+  leftPlayers: [],
 };
 
 function actions(set: (fn: (s: AppState) => Partial<AppState>) => void) {
   return {
+    setLang: (lang: Lang) => set(() => ({ lang })),
+    setMuted: (muted: boolean) => set(() => ({ muted })),
+    setMusicMuted: (v: boolean) => set(() => ({ musicMuted: v })),
     setDeviceId: (id: string) => set(() => ({ deviceId: id })),
     setMyPlayer: (player: Player) => set(() => ({ myPlayer: player })),
     setGame: (game: Game) => set(() => ({ game })),
@@ -117,12 +168,44 @@ function actions(set: (fn: (s: AppState) => Partial<AppState>) => void) {
     setMyTasks: (tasks: PlayerTask[]) => set(() => ({ myTasks: tasks })),
     updateTaskStatus: (taskId: string, status: TaskStatus) =>
       set((s) => ({
-        myTasks: s.myTasks.map((t) =>
-          t.id === taskId ? { ...t, status } : t
-        ),
+        myTasks: s.myTasks.map((t) => (t.id === taskId ? { ...t, status } : t)),
       })),
     setActiveAccusation: (accusation: Accusation | null) =>
       set(() => ({ activeAccusation: accusation })),
+    setBuzzer: (player: Player | null) =>
+      set(() => ({ buzzer: player })),
+    addValidatingTask: (id) =>
+      set((s) => ({
+        validatingTasks: s.validatingTasks.some((e) => e.id === id)
+          ? s.validatingTasks
+          : [...s.validatingTasks, { id, startedAt: Date.now(), frozenAt: null }],
+      })),
+    removeValidatingTask: (id) =>
+      set((s) => ({ validatingTasks: s.validatingTasks.filter((e) => e.id !== id) })),
+    clearValidatingTasks: () => set(() => ({ validatingTasks: [] })),
+    addLeftPlayerId: (id) =>
+      set((s) => ({
+        leftPlayerIds: s.leftPlayerIds.includes(id) ? s.leftPlayerIds : [...s.leftPlayerIds, id],
+      })),
+    addLeftPlayer: (player) =>
+      set((s) => ({
+        leftPlayers: s.leftPlayers.some((p) => p.id === player.id)
+          ? s.leftPlayers
+          : [...s.leftPlayers, player],
+        leftPlayerIds: s.leftPlayerIds.includes(player.id)
+          ? s.leftPlayerIds
+          : [...s.leftPlayerIds, player.id],
+      })),
+    activateTauk: () =>
+      set((s) => ({
+        taukActive: true,
+        taukFiredAt: Date.now(),
+        validatingTasks: s.validatingTasks.map((e) => ({
+          ...e,
+          frozenAt: e.frozenAt ?? Date.now(),
+        })),
+      })),
+    deactivateTauk: () => set(() => ({ taukActive: false, taukFiredAt: null })),
     reset: () =>
       set(() => ({
         myPlayer: null,
@@ -131,6 +214,11 @@ function actions(set: (fn: (s: AppState) => Partial<AppState>) => void) {
         currentRound: null,
         myTasks: [],
         activeAccusation: null,
+        validatingTasks: [],
+        taukActive: false,
+        taukFiredAt: null,
+        leftPlayerIds: [],
+        leftPlayers: [],
       })),
   };
 }

@@ -13,6 +13,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "autoIncrement": true,
       "ios": {
         "simulator": false
       }
@@ -21,6 +22,10 @@
       "autoIncrement": true,
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://uiqesxuvketahitfgeqn.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpcWVzeHV2a2V0YWhpdGZnZXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNzk0MzksImV4cCI6MjEwNDg1NTQzOX0.xmOgsIntOTXAq3zVz0rg6v3yWO1McvkZhczorjePuqQ"
       }
     }
   },

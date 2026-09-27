@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store';
 import type { Character, Round } from '@/store';
 import { useRoundTimer } from '@/hooks/useRoundTimer';
+import { playSound } from '@/lib/sound';
 
 import ChousSvg     from '@/assets/images/personnages/character-choux.svg';
 import AvocadoSvg   from '@/assets/images/personnages/character-avocado.svg';
@@ -125,6 +126,7 @@ export default function SpectateurScreen() {
             };
           }
 
+          playSound('bonusPoint');
           postModalRef.current = () => router.replace('/game');
           setPointModalData(data);
         },

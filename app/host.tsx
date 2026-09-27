@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { startGame, loadPlayers, setPlayerReady, updatePlayerPseudo, kickPlayer, transferHost, updateRoundCount, updateRoundDurationS } from '@/lib/game';
 import type { TimerDuration } from '@/components/GameMenu';
 import { useStore } from '@/store';
+import { useThemeMusic } from '@/hooks/useThemeMusic';
+import { playSound } from '@/lib/sound';
 import type { Character, Game, GameMode, Player, Round } from '@/store';
 
 const MODE_LABELS: Record<GameMode, string> = {
@@ -173,6 +175,7 @@ interface TimerSuggestion {
 
 export default function HostScreen() {
   const { game, myPlayer, players, setGame, setPlayers, setCurrentRound, setMyPlayer, upsertPlayer } = useStore();
+  useThemeMusic();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const shownSuggestionThresholdsRef = useRef(new Set<number>());
   const [timerSuggestion, setTimerSuggestion] = useState<TimerSuggestion | null>(null);
@@ -221,8 +224,13 @@ export default function HostScreen() {
 
     const channel = supabase
       .channel(`lobby-${game.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${game.id}` }, () => refreshPlayers())
-      .on('broadcast', { event: 'player_ready' }, ({ payload }: { payload: Player }) => upsertPlayer(payload))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=eq.${game.id}` }, () => { refreshPlayers(); playSound('playerJoin'); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `game_id=eq.${game.id}` }, () => refreshPlayers())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'players', filter: `game_id=eq.${game.id}` }, () => refreshPlayers())
+      .on('broadcast', { event: 'player_ready' }, ({ payload }: { payload: Player }) => {
+        if (payload.id !== myId) playSound('playerReady');
+        upsertPlayer(payload);
+      })
       .on('broadcast', { event: 'pseudo_update' }, ({ payload }: { payload: Player }) => upsertPlayer(payload))
       .on('broadcast', { event: 'round_count_changed' }, ({ payload }: { payload: { round_count: number } }) => {
         setRoundNotif(payload.round_count);
@@ -234,6 +242,7 @@ export default function HostScreen() {
         if (payload.playerId === myId) {
           setKickedNotif(true);
         } else {
+          playSound('playerLeft');
           setPlayers(useStore.getState().players.filter(p => p.id !== payload.playerId));
         }
       })
@@ -319,6 +328,7 @@ export default function HostScreen() {
   async function handleReady() {
     if (!myPlayer?.id) return;
     const next = !myPlayer.is_ready;
+    if (next) playSound('playerReady');
     await setPlayerReady(myPlayer.id, next);
     const updated = { ...myPlayer, is_ready: next };
     setMyPlayer(updated);
@@ -621,7 +631,7 @@ export default function HostScreen() {
           </Pressable>
           <Pressable
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
-            onPress={() => setMenuVisible(true)}
+            onPress={() => { playSound('uiPress'); setMenuVisible(true); }}
             accessibilityRole="button"
             accessibilityLabel="Paramètres"
           >

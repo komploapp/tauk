@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Animated, {
@@ -13,12 +13,24 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ToqueBackground } from '@/components/ToqueBackground';
 import { palette } from '@/constants/palette';
+import { useStore } from '@/store';
 
 const ANIM_DURATION_MS = 1600;
 
 export default function GoScreen() {
   const scale = useSharedValue(0);
   const opacity = useSharedValue(1);
+
+  function handleQuit() {
+    Alert.alert(
+      'Quitter la partie ?',
+      'Tu vas quitter la partie en cours.',
+      [
+        { text: 'Rester', style: 'cancel' },
+        { text: 'Quitter', style: 'destructive', onPress: () => { useStore.getState().reset(); router.replace('/'); } },
+      ],
+    );
+  }
 
   function dismiss() {
     router.replace('/game');
@@ -60,7 +72,7 @@ export default function GoScreen() {
           </Pressable>
           <Pressable
             style={styles.settingsBtn}
-            onPress={() => router.replace('/')}
+            onPress={handleQuit}
             accessibilityRole="button"
             accessibilityLabel="Quitter"
           >

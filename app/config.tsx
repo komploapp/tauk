@@ -2,12 +2,14 @@ import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Modal, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ToqueBackground } from '@/components/ToqueBackground';
+import { TutorialModal } from '@/components/TutorialModal';
 import OignonSvg from '@/assets/images/oignon-heureux.svg';
 import OeufSvg from '@/assets/images/oeuf-loupe.svg';
 import ChamallowSvg from '@/assets/images/chamallow.svg';
@@ -16,9 +18,10 @@ import { createGame, getOrCreateDeviceId } from '@/lib/game';
 import { t } from '@/lib/i18n';
 import { useStore } from '@/store';
 import type { Character } from '@/store';
+import { playSound } from '@/lib/sound';
 
-const CARD_H = 207;
 const CARD_W = 360;
+const CARD_ASPECT = 0.5;
 
 const ALL_CHARACTERS: Character[] = [
   'choux', 'avocado', 'onion', 'carot', 'banana',
@@ -26,6 +29,7 @@ const ALL_CHARACTERS: Character[] = [
 ];
 
 interface ModeCardProps {
+  cardWidth: number;
   title: string;
   description: string;
   players: string;
@@ -36,6 +40,7 @@ interface ModeCardProps {
   charRotate?: string;
   comingSoon?: boolean;
   onPress?: () => void;
+  onInfoPress?: () => void;
 }
 
 function PlayersBadge({ label }: { label: string }) {
@@ -47,15 +52,20 @@ function PlayersBadge({ label }: { label: string }) {
 }
 
 function ModeCard({
-  title, description, players, Character, charWidth, charHeight,
-  charLeft, charRotate, comingSoon = false, onPress,
+  cardWidth, title, description, players, Character, charWidth, charHeight,
+  charLeft, charRotate, comingSoon = false, onPress, onInfoPress,
 }: ModeCardProps) {
   const lang = useStore((s) => s.lang);
+  const scale = cardWidth / CARD_W;
+  const cardHeight = Math.round(cardWidth * CARD_ASPECT);
+  const sCharW = Math.round(charWidth * scale);
+  const sCharH = Math.round(charHeight * scale);
+  const sCharL = Math.round(charLeft * scale);
+  const contentWidth = Math.round(152 * scale);
+
   return (
-    /* cardWrap : bordure visible SANS overflow:hidden → le contenu interne reste 360×207 */
-    <View style={styles.cardWrap}>
+    <View style={[styles.cardWrap, { width: cardWidth + 2 * border.width, height: cardHeight + 2 * border.width }]}>
       <View style={styles.card}>
-        {/* Pressable = tout le contenu. opacity:0.4 quand comingSoon → toute la carte est dimmée */}
         <Pressable
           onPress={!comingSoon ? onPress : undefined}
           style={({ pressed }) => [
@@ -69,18 +79,25 @@ function ModeCard({
             <View style={styles.cardBg} />
             <View style={styles.cardHighlight} />
           </View>
-          <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>{title}</Text>
+          <View style={[styles.cardContent, { width: contentWidth }]}>
+            <View style={styles.titleRow}>
+              <Text style={styles.cardTitle}>{title}</Text>
+              {onInfoPress && (
+                <Pressable onPress={onInfoPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Voir le tutoriel ${title}`}>
+                  <Ionicons name="information-circle-outline" size={22} color={palette.brandGreen} />
+                </Pressable>
+              )}
+            </View>
             <Text style={styles.cardDesc}>{description}</Text>
           </View>
           <View
             style={[
               styles.charWrap,
-              { left: charLeft, width: charWidth, height: charHeight },
+              { left: sCharL, width: sCharW, height: sCharH },
               charRotate ? { transform: [{ rotate: charRotate }] } : undefined,
             ]}
           >
-            <Character width={charWidth} height={charHeight} />
+            <Character width={sCharW} height={sCharH} />
           </View>
           <PlayersBadge label={players} />
         </Pressable>
@@ -101,7 +118,11 @@ export default function ConfigScreen() {
   const TIMER_OPTIONS: TimerDuration[] = [null, 60, 180, 300];
   const TIMER_LABELS: Record<string, string> = { 'null': '∞', '60': "1'", '180': "3'", '300': "5'" };
 
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = Math.min(screenWidth - 2 * spacing.medium, CARD_W);
+
   const [modalVisible, setModalVisible] = useState(false);
+  const [tutorialVisible, setTutorialVisible] = useState(false);
   const [pseudo, setPseudo] = useState('');
   const [rounds, setRounds] = useState<3 | 6 | 10>(3);
   const [timerDuration, setTimerDuration] = useState<TimerDuration>(60);
@@ -167,39 +188,45 @@ export default function ConfigScreen() {
 
           <View style={styles.cardList}>
             <ModeCard
+              cardWidth={cardWidth}
               title="Fourneaux"
               description="Réalisez vos défis secrets en cachette et piégez vos convives !"
               players="2-10 joueurs"
               Character={OignonSvg}
-              charWidth={191}
-              charHeight={199}
-              charLeft={169}
-              onPress={() => setModalVisible(true)}
+              charWidth={168}
+              charHeight={175}
+              charLeft={184}
+              onPress={() => { playSound('uiPress'); setModalVisible(true); }}
+              onInfoPress={() => { playSound('uiPress'); setTutorialVisible(true); }}
             />
             <ModeCard
+              cardWidth={cardWidth}
               title="Carnage"
               description="Garde un œil sur ta proie sans finir toi-même sur le gril !"
               players="3-10 joueurs"
               Character={OeufSvg}
-              charWidth={179}
-              charHeight={169}
-              charLeft={186}
+              charWidth={157}
+              charHeight={148}
+              charLeft={201}
               comingSoon
             />
             <ModeCard
+              cardWidth={cardWidth}
               title="Binomes"
               description="Repère ton complice et taukez en même temps !"
               players="3-10 joueurs"
               Character={ChamallowSvg}
-              charWidth={112}
-              charHeight={236}
-              charLeft={196}
+              charWidth={98}
+              charHeight={207}
+              charLeft={211}
               charRotate="20.04deg"
               comingSoon
             />
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      <TutorialModal visible={tutorialVisible} onClose={() => setTutorialVisible(false)} />
 
       <Modal
         visible={modalVisible}
@@ -208,9 +235,9 @@ export default function ConfigScreen() {
         animationType="fade"
         onRequestClose={() => !loading && setModalVisible(false)}
       >
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.58)' }}>
           <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-            <BlurView style={StyleSheet.absoluteFillObject} intensity={25} tint="dark" />
+            <BlurView style={StyleSheet.absoluteFillObject} intensity={50} tint="dark" />
           </View>
           <Pressable
             style={{ flex: 1 }}
@@ -249,7 +276,7 @@ export default function ConfigScreen() {
                       rounds === n && styles.roundsChipActive,
                       pressed && styles.pressed,
                     ]}
-                    onPress={() => setRounds(n)}
+                    onPress={() => { playSound('uiPress'); setRounds(n); }}
                     accessibilityRole="radio"
                     accessibilityLabel={`${n} services`}
                     accessibilityState={{ selected: rounds === n }}
@@ -276,7 +303,7 @@ export default function ConfigScreen() {
                         active && styles.roundsChipActive,
                         pressed && styles.pressed,
                       ]}
-                      onPress={() => setTimerDuration(d)}
+                      onPress={() => { playSound('uiPress'); setTimerDuration(d); }}
                       accessibilityRole="radio"
                       accessibilityLabel={d === null ? 'Sans timer' : `${d / 60} minute${d > 60 ? 's' : ''}`}
                       accessibilityState={{ selected: active }}
@@ -332,17 +359,16 @@ const styles = StyleSheet.create({
   backBtnText: { fontFamily: 'Recursive_600SemiBold', fontSize: 22, color: palette.brandPink },
   scroll: { flex: 1 },
   scrollContent: {
-    paddingHorizontal: (393 - CARD_W - 2 * border.width) / 2,
+    paddingHorizontal: spacing.medium,
+    paddingTop: spacing.small,
     paddingBottom: spacing.medium,
     gap: spacing.medium,
   },
   sectionTitle: { fontFamily: 'Recursive_600SemiBold', fontSize: 22, color: palette.brandPink },
   cardList: { gap: spacing.xsmall },
 
-  /* Bordure sur le wrapper externe — pas d'overflow:hidden ici */
+  /* Bordure sur le wrapper externe — dimensions calculées dynamiquement dans ModeCard */
   cardWrap: {
-    width: CARD_W + 2 * border.width,
-    height: CARD_H + 2 * border.width,
     borderRadius: radius.main + border.width,
     borderWidth: border.width,
     borderColor: palette.borderPeach,
@@ -354,9 +380,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardPressable: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: spacing.medium, paddingVertical: spacing.xsmall,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingTop: spacing.small,
+    paddingHorizontal: spacing.small,
   },
   cardDimmed: { opacity: 0.4 },
   cardBg: {
@@ -367,19 +394,19 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     borderTopWidth: 5, borderLeftWidth: 5, borderColor: palette.highlightInner, borderRadius: radius.main,
   },
-  cardContent: { width: 144, gap: spacing.xsmall, zIndex: 1 },
+  cardContent: { gap: 8, zIndex: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardTitle: { fontFamily: 'Recursive_600SemiBold', fontSize: 18, color: palette.brandGreen },
-  cardDesc: { fontFamily: 'Recursive_400Regular', fontSize: 16, color: palette.textPrimary, lineHeight: 22 },
+  cardDesc: { fontFamily: 'Recursive_400Regular', fontSize: 14, color: palette.textPrimary, lineHeight: 20 },
   charWrap: { position: 'absolute', bottom: 0 },
   badge: {
-    position: 'absolute', top: 12, right: 12,
+    position: 'absolute', top: 13, right: 12,
     backgroundColor: palette.bgPink, borderRadius: radius.chip,
     paddingHorizontal: 6, paddingVertical: 3, zIndex: 2,
   },
   badgeText: { fontFamily: 'Recursive_400Regular', fontSize: 14, color: palette.brandPink, opacity: 0.5 },
   comingSoonWrap: {
-    position: 'absolute', top: 0, left: 0,
-    width: CARD_W, height: CARD_H,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
   },
   comingSoonBox: {
