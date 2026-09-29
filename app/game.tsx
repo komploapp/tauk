@@ -25,10 +25,11 @@ import type { PlayerTask, Accusation } from '@/store';
 import { playSound } from '@/lib/sound';
 import { useRoundTimer } from '@/hooks/useRoundTimer';
 
-const ITEM_HEIGHT   = 76;
-const LONG_PRESS_MS = 300;
-const VALIDATION_MS = 10_000;
-const FILL_COLOR    = '#FFEBEF';
+const ITEM_HEIGHT    = 76;
+const LONG_PRESS_MS  = 300;
+const VALIDATION_MS  = 10_000;
+const FILL_COLOR     = '#FFEBEF';
+const TAUK_CHARGE_MS = 300;
 
 // Set module-level : conservé entre re-montages du composant, réinitialisé au redémarrage de l'app
 const _hintPlayedRounds = new Set<string>();
@@ -398,9 +399,12 @@ export default function GameScreen() {
   const taukBtnRef             = useRef<View>(null);
   const taukBtnMeasureRef      = useRef({ pageY: 0, height: 100 });
   const taukTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const taukFiredRef           = useRef(false);
   const taukScaleY             = useSharedValue(1);
   const taukOverlayOpacity     = useSharedValue(0);
   const taukTextOpacity        = useSharedValue(0);
+  const taukChargeProgress     = useSharedValue(0);
+  const taukBtnWidth           = useSharedValue(0);
   const [taukOverlayPos, setTaukOverlayPos] = useState({ top: 0, height: 100 });
 
   const { leftPlayer, isGameOver, dismissPlayerLeft } = usePlayerLeft();
@@ -581,6 +585,13 @@ export default function GameScreen() {
     opacity: taukTextOpacity.value,
   }));
 
+  const taukChargeFillStyle = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    width: taukChargeProgress.value * taukBtnWidth.value,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  }));
+
   const playTaukTransition = useCallback((onComplete: () => void) => {
     const screenH    = Dimensions.get('window').height;
     const { pageY, height } = taukBtnMeasureRef.current;
@@ -598,9 +609,43 @@ export default function GameScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function fireTauk() {
+    if (taukFiredRef.current) return;
+    taukFiredRef.current = true;
+    playSound('taukBell');
+    activateTauk();
+    if (otherPlayers.length === 1) {
+      playTaukTransition(() => {
+        setBuzzer(myPlayer);
+        handleAccuse(otherPlayers[0].id);
+      });
+    } else {
+      broadcastTauk();
+      playTaukTransition(() => setAccuseVisible(true));
+    }
+  }
+
+  function handleTaukPressIn() {
+    taukFiredRef.current = false;
+    taukChargeProgress.value = 0;
+    taukChargeProgress.value = withTiming(1, { duration: TAUK_CHARGE_MS, easing: Easing.linear }, (finished) => {
+      if (finished) runOnJS(fireTauk)();
+    });
+  }
+
+  function handleTaukPressOut() {
+    if (taukFiredRef.current) return;
+    cancelAnimation(taukChargeProgress);
+    taukChargeProgress.value = withTiming(0, { duration: 200 });
+  }
+
   // Cleanup timer on unmount
   useEffect(() => {
-    return () => { if (taukTransitionTimerRef.current) clearTimeout(taukTransitionTimerRef.current); };
+    return () => {
+      if (taukTransitionTimerRef.current) clearTimeout(taukTransitionTimerRef.current);
+      cancelAnimation(taukChargeProgress);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const orderedTasks     = localOrder.map((id) => myTasks.find((t) => t.id === id)).filter((t): t is PlayerTask => t !== undefined);
@@ -721,32 +766,23 @@ export default function GameScreen() {
         {/* ── TAUK sticky button ──────────────────────── */}
         <Pressable
           ref={taukBtnRef}
-          onLayout={() => {
+          onLayout={(e) => {
+            taukBtnWidth.value = e.nativeEvent.layout.width;
             taukBtnRef.current?.measure((_, __, ___, h, ____, py) => {
               taukBtnMeasureRef.current = { pageY: py, height: h };
               setTaukOverlayPos({ top: py, height: h });
             });
           }}
           style={({ pressed }) => [styles.taukBtn, pressed && styles.taukBtnPressed]}
-          onPress={() => {
-            playSound('taukBell');
-            activateTauk();
-            if (otherPlayers.length === 1) {
-              playTaukTransition(() => {
-                setBuzzer(myPlayer);
-                handleAccuse(otherPlayers[0].id);
-              });
-            } else {
-              broadcastTauk();
-              playTaukTransition(() => setAccuseVisible(true));
-            }
-          }}
+          onPressIn={handleTaukPressIn}
+          onPressOut={handleTaukPressOut}
           accessibilityRole="button"
           accessibilityLabel="TAUK ! Accuser un joueur"
         >
           {({ pressed }) => (
             <>
               <View style={[styles.taukHighlight, pressed && { opacity: 0 }]} />
+              <Animated.View style={taukChargeFillStyle} />
               <Text style={styles.taukTitle}>TAUK !</Text>
               <Text style={styles.taukSubtitle}>Maintenir pour accuser</Text>
             </>
