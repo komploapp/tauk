@@ -87,18 +87,7 @@ export function ShareModal({ visible, gameCode, onClose }: Props) {
 
         <View style={styles.sheet}>
           {/* ── Header ── */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Inviter des convives</Text>
-            <Pressable
-              style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
-              onPress={() => { playSound('uiPress'); onClose(); }}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              accessibilityRole="button"
-              accessibilityLabel="Fermer"
-            >
-              <Ionicons name="close" size={20} color={palette.brandPink} />
-            </Pressable>
-          </View>
+          <Text style={styles.title}>Inviter des convives</Text>
 
           {/* ── QR code ── */}
           <Pressable
@@ -207,24 +196,12 @@ const styles = StyleSheet.create({
   },
 
   // ── Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   title: {
     fontFamily: 'Staatliches_400Regular',
     fontSize: 26,
-    color: palette.textPrimary,
+    color: palette.brandPink,
     lineHeight: 30,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,20,134,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    textAlign: 'center',
   },
 
   // ── QR
