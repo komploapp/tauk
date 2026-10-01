@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Share, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, TextInput, Modal } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import PenSvg from '@/assets/images/pen.svg';
 import { ToqueBackground } from '@/components/ToqueBackground';
 import { GameMenu } from '@/components/GameMenu';
+import { ShareModal } from '@/components/ShareModal';
 import { palette, spacing, radius } from '@/constants/palette';
 import { supabase } from '@/lib/supabase';
 import { startGame, loadPlayers, setPlayerReady, updatePlayerPseudo, kickPlayer, transferHost, updateRoundCount, updateRoundDurationS } from '@/lib/game';
@@ -180,6 +181,7 @@ export default function HostScreen() {
   const shownSuggestionThresholdsRef = useRef(new Set<number>());
   const [timerSuggestion, setTimerSuggestion] = useState<TimerSuggestion | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [shareVisible, setShareVisible] = useState(false);
   const [adminTarget, setAdminTarget] = useState<Player | null>(null);
   const [roundNotif, setRoundNotif] = useState<number | null>(null);
   const [timerNotif, setTimerNotif] = useState<TimerDuration | 'idle'>('idle');
@@ -318,11 +320,9 @@ export default function HostScreen() {
     );
   }
 
-  async function handleShare() {
+  function handleShare() {
     if (!game?.code) return;
-    await Share.share({
-      message: `Rejoins ma partie Tauk ! 🎮\nCode : ${game.code}\n\nTélécharge l'app : https://tauk.app`,
-    });
+    setShareVisible(true);
   }
 
   async function handleReady() {
@@ -617,6 +617,15 @@ export default function HostScreen() {
         </View>
       </Modal>
 
+      {/* ── Share modal ── */}
+      {game?.code && (
+        <ShareModal
+          visible={shareVisible}
+          gameCode={game.code}
+          onClose={() => setShareVisible(false)}
+        />
+      )}
+
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* ── Header ── */}
         <View style={styles.header}>
@@ -800,7 +809,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: palette.brandPink,
     letterSpacing: 4.8,
-    opacity: 0.5,
   },
 
   // ── My featured card

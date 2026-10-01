@@ -200,13 +200,13 @@ export default function SpectateurScreen() {
         {/* ── Bloc 1 : frozen number + titre ── */}
         <View style={styles.numberSection}>
           {game?.round_duration_s != null && (
-            <View style={styles.frozenNumber}>
-              <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-                <IceSvg width={112} height={112} />
+            <View style={styles.iceBlock}>
+              <IceSvg width={112} height={112} />
+              <View style={styles.timerOverlay}>
+                <Text style={[styles.timerFrozen, isUrgent && styles.timerFrozenUrgent]}>
+                  {timerDisplay}
+                </Text>
               </View>
-              <Text style={[styles.timerFrozen, isUrgent && styles.timerFrozenUrgent]}>
-                {timerDisplay}
-              </Text>
             </View>
           )}
           <Text style={styles.title}>Accusation en cours...</Text>
@@ -283,9 +283,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 47,
   },
-  frozenNumber: {
+  iceBlock: {
     width: 112,
     height: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -356,18 +365,18 @@ const styles = StyleSheet.create({
   },
 
   waitingBox: {
-    backgroundColor: 'rgba(255, 20, 134, 0.04)',
+    backgroundColor: 'rgba(255, 20, 134, 0.1)',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    alignSelf: 'center',
   },
   waitingText: {
     fontFamily: 'Recursive_400Regular',
     fontSize: 20,
     color: palette.brandPink,
-    opacity: 0.5,
-    width: 230,
     lineHeight: 26,
+    textAlign: 'center',
   },
 
   headerSafe: {
