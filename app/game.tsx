@@ -434,19 +434,34 @@ export default function GameScreen() {
     setHintActive(false);
   }
 
-  // Commit la pause TAUK au moment exact où le jeu reprend (après modal de résolution).
-  // Appel idempotent : la fonction SQL vérifie paused_since IS NOT NULL.
   useFocusEffect(
     useCallback(() => {
-      const { activeAccusation, currentRound: round, myPlayer: me } = useStore.getState();
-      // Swipe-back depuis /spectateur : l'accusation est encore pending → l'annuler
+      const { activeAccusation, currentRound: round, myPlayer: me, taukFiredAt: fired } = useStore.getState();
       if (activeAccusation?.result === 'pending' && activeAccusation.accuser_id === me?.id) {
+        // Swipe-back depuis /spectateur : l'accusation est encore pending → l'annuler
         cancelAccusation(activeAccusation.id).catch(() => {});
-      } else if (round?.paused_since && activeAccusation?.id) {
-        supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: activeAccusation.id }).catch(() => {});
+      } else if (activeAccusation?.id && round) {
+        // Commit immédiat côté client : on n'attend pas le Realtime de commit_round_pause_from_accusation.
+        // Source préférée : paused_since (timestamp serveur). Fallback : taukFiredAt (timestamp local,
+        // utilisé quand le Realtime de start_round_pause n'est pas encore arrivé dans le store).
+        const pauseStartMs = round.paused_since
+          ? new Date(round.paused_since).getTime()
+          : fired;
+        if (pauseStartMs != null) {
+          const pauseDuration = Math.max(0, Date.now() - pauseStartMs);
+          setCurrentRound({
+            ...round,
+            total_paused_ms: (round.total_paused_ms ?? 0) + pauseDuration,
+            paused_since: null,
+          });
+        }
+        // Synchroniser le serveur (idempotent : la fonction SQL vérifie paused_since IS NOT NULL).
+        const accusationId = activeAccusation.id;
+        (async () => {
+          try { await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: accusationId }); } catch {}
+        })();
       }
       deactivateTauk();
-      // Masquer l'overlay TAUK (peut rester visible si retour avant fin de transition)
       taukOverlayOpacity.value = 0;
       taukTextOpacity.value = 0;
       taukScaleY.value = 1;
