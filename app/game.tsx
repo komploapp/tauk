@@ -441,25 +441,30 @@ export default function GameScreen() {
         // Swipe-back depuis /spectateur : l'accusation est encore pending → l'annuler
         cancelAccusation(activeAccusation.id).catch(() => {});
       } else if (activeAccusation?.id && round) {
-        // Commit immédiat côté client : on n'attend pas le Realtime de commit_round_pause_from_accusation.
-        // Source préférée : paused_since (timestamp serveur). Fallback : taukFiredAt (timestamp local,
-        // utilisé quand le Realtime de start_round_pause n'est pas encore arrivé dans le store).
-        const pauseStartMs = round.paused_since
-          ? new Date(round.paused_since).getTime()
-          : fired;
-        if (pauseStartMs != null) {
-          const pauseDuration = Math.max(0, Date.now() - pauseStartMs);
-          setCurrentRound({
-            ...round,
-            total_paused_ms: (round.total_paused_ms ?? 0) + pauseDuration,
-            paused_since: null,
-          });
+        if (activeAccusation.accuser_id === me?.id) {
+          // Seul l'accusateur déclenche la reprise : il est le dernier à revenir sur /game
+          // (après avoir fermé la PointAttributionModal dans /spectateur).
+          // Les autres joueurs (buzz, accusé) arrivent avant et restent figés via paused_since
+          // jusqu'à ce que le Realtime de commit_round_pause_from_accusation arrive pour tous.
+          const pauseStartMs = round.paused_since
+            ? new Date(round.paused_since).getTime()
+            : fired;
+          if (pauseStartMs != null) {
+            const pauseDuration = Math.max(0, Date.now() - pauseStartMs);
+            setCurrentRound({
+              ...round,
+              total_paused_ms: (round.total_paused_ms ?? 0) + pauseDuration,
+              paused_since: null,
+            });
+          }
+          const accusationId = activeAccusation.id;
+          (async () => {
+            try { await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: accusationId }); } catch {}
+          })();
         }
-        // Synchroniser le serveur (idempotent : la fonction SQL vérifie paused_since IS NOT NULL).
-        const accusationId = activeAccusation.id;
-        (async () => {
-          try { await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: accusationId }); } catch {}
-        })();
+        // Les non-accusateurs ne font rien ici : leur store se met à jour via
+        // le Realtime postgres_changes sur rounds (total_paused_ms + paused_since = null)
+        // déclenché par commit_round_pause_from_accusation côté accusateur.
       }
       deactivateTauk();
       taukOverlayOpacity.value = 0;
