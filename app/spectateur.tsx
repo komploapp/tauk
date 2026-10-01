@@ -159,7 +159,14 @@ export default function SpectateurScreen() {
 
   function handlePointModalClose() {
     setPointModalData(null);
-    postModalRef.current();
+    // L'accusateur déclenche la reprise du chrono pour tous les joueurs.
+    // Les autres (accuse.tsx, buzz.tsx) écoutent l'event Realtime qui en résulte.
+    const { myPlayer: me, activeAccusation: acc } = useStore.getState();
+    if (acc?.id && me?.id === acc.accuser_id) {
+      const id = acc.id;
+      (async () => { try { await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: id }); } catch {} })();
+    }
+    router.replace('/game');
   }
 
   function handleBack() {

@@ -11,7 +11,7 @@ import { usePlayerLeft } from '@/hooks/usePlayerLeft';
 import { PlayerLeftModal } from '@/components/PlayerLeftModal';
 import { useStore } from '@/store';
 import { supabase } from '@/lib/supabase';
-import type { Character, Accusation } from '@/store';
+import type { Character, Accusation, Round } from '@/store';
 
 import ChousSvg     from '@/assets/images/personnages/character-choux.svg';
 import AvocadoSvg   from '@/assets/images/personnages/character-avocado.svg';
@@ -51,13 +51,24 @@ export default function BuzzScreen() {
   const bcChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [pointModalData, setPointModalData] = useState<PointAttributionData | null>(null);
   const postModalRef = useRef<() => void>(() => {});
-  const { game, buzzer, myPlayer, currentRound, setActiveAccusation, players, reset } = useStore();
+  const [waitingForResume, setWaitingForResume] = useState(false);
+  const waitingRef = useRef(false);
+  const { game, buzzer, myPlayer, currentRound, setActiveAccusation, setCurrentRound, players, reset } = useStore();
   const { leftPlayer, isGameOver, dismissPlayerLeft } = usePlayerLeft();
 
   function handlePointModalClose() {
     setPointModalData(null);
     postModalRef.current();
   }
+
+  // Sécurité : si le Realtime n'arrive pas dans les 8 s, on navigue quand même.
+  useEffect(() => {
+    if (!waitingForResume) return;
+    const id = setTimeout(() => {
+      if (waitingRef.current) { waitingRef.current = false; router.replace('/game'); }
+    }, 8000);
+    return () => clearTimeout(id);
+  }, [waitingForResume]);
 
   function handleQuit() {
     Alert.alert(
@@ -121,7 +132,17 @@ export default function BuzzScreen() {
             };
           }
 
-          postModalRef.current = () => router.replace('/game');
+          postModalRef.current = () => {
+            const { currentRound: round } = useStore.getState();
+            if (!round?.paused_since) {
+              // L'accusateur a déjà commité — navigation directe.
+              router.replace('/game');
+            } else {
+              // On attend le Realtime paused_since = null.
+              waitingRef.current = true;
+              setWaitingForResume(true);
+            }
+          };
           setPointModalData(data);
         },
       )
@@ -129,10 +150,18 @@ export default function BuzzScreen() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'rounds', filter: `id=eq.${currentRound.id}` },
         (payload) => {
-          const status = (payload.new as { status: string }).status;
-          if (status === 'countdown') {
+          const newRound = payload.new as Round;
+          setCurrentRound(newRound);
+          if (newRound.status === 'countdown') {
             const { players: p } = useStore.getState();
             router.replace(p.length <= 2 ? '/resultat-manche-1v1' : '/resultat-manche');
+            return;
+          }
+          // Reprise synchronisée : paused_since = null signifie que l'accusateur
+          // a commité la pause → tout le monde peut retourner sur /game.
+          if (!newRound.paused_since && waitingRef.current) {
+            waitingRef.current = false;
+            router.replace('/game');
           }
         },
       )
@@ -200,7 +229,9 @@ export default function BuzzScreen() {
       {/* Waiting text */}
       <View style={styles.waitingArea} pointerEvents="box-none">
         <View style={styles.waitingBox}>
-          <Text style={styles.waitingText}>Il aiguise son couteau...</Text>
+          <Text style={styles.waitingText}>
+            {waitingForResume ? 'En attente des autres joueurs...' : 'Il aiguise son couteau...'}
+          </Text>
         </View>
       </View>
 

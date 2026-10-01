@@ -441,30 +441,20 @@ export default function GameScreen() {
         // Swipe-back depuis /spectateur : l'accusation est encore pending → l'annuler
         cancelAccusation(activeAccusation.id).catch(() => {});
       } else if (activeAccusation?.id && round) {
-        if (activeAccusation.accuser_id === me?.id) {
-          // Seul l'accusateur déclenche la reprise : il est le dernier à revenir sur /game
-          // (après avoir fermé la PointAttributionModal dans /spectateur).
-          // Les autres joueurs (buzz, accusé) arrivent avant et restent figés via paused_since
-          // jusqu'à ce que le Realtime de commit_round_pause_from_accusation arrive pour tous.
-          const pauseStartMs = round.paused_since
-            ? new Date(round.paused_since).getTime()
-            : fired;
-          if (pauseStartMs != null) {
-            const pauseDuration = Math.max(0, Date.now() - pauseStartMs);
-            setCurrentRound({
-              ...round,
-              total_paused_ms: (round.total_paused_ms ?? 0) + pauseDuration,
-              paused_since: null,
-            });
-          }
+        // Fallback accusateur : spectateur.tsx appelle le RPC à la fermeture de la modale,
+        // mais si l'accusateur est revenu via handleBack (sans passer par la modale),
+        // on déclenche ici. Gated sur paused_since pour ne pas fausser total_paused_ms
+        // si le Realtime est déjà arrivé avant useFocusEffect.
+        if (activeAccusation.accuser_id === me?.id && round.paused_since) {
+          const pauseStartMs = new Date(round.paused_since).getTime();
+          const pauseDuration = Math.max(0, Date.now() - pauseStartMs);
+          setCurrentRound({ ...round, total_paused_ms: (round.total_paused_ms ?? 0) + pauseDuration, paused_since: null });
           const accusationId = activeAccusation.id;
-          (async () => {
-            try { await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: accusationId }); } catch {}
-          })();
+          (async () => { try { await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: accusationId }); } catch {} })();
         }
-        // Les non-accusateurs ne font rien ici : leur store se met à jour via
-        // le Realtime postgres_changes sur rounds (total_paused_ms + paused_since = null)
-        // déclenché par commit_round_pause_from_accusation côté accusateur.
+        // Les non-accusateurs naviguent depuis accuse.tsx / buzz.tsx uniquement quand
+        // ils reçoivent le Realtime paused_since = null (voir ces fichiers).
+        // À ce stade paused_since est déjà null dans leur store → deactivateTauk() suffit.
       }
       deactivateTauk();
       taukOverlayOpacity.value = 0;
