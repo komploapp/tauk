@@ -16,7 +16,7 @@ import { ToqueBackground } from '@/components/ToqueBackground';
 import { AccuseOverlay } from '@/components/AccuseOverlay';
 import { GameMenu } from '@/components/GameMenu';
 import { palette, spacing } from '@/constants/palette';
-import { markTaskDone, createAccusation, cancelAccusation, kickPlayer, broadcastPlayerLeft } from '@/lib/game';
+import { markTaskDone, createAccusation, cancelAccusation, pauseRound, kickPlayer, broadcastPlayerLeft } from '@/lib/game';
 import { usePlayerLeft } from '@/hooks/usePlayerLeft';
 import { PlayerLeftModal } from '@/components/PlayerLeftModal';
 import { supabase } from '@/lib/supabase';
@@ -505,6 +505,7 @@ export default function GameScreen() {
         { event: 'tauk_pressed' },
         ({ payload }: { payload: { buzzer: typeof myPlayer } }) => {
           setBuzzer(payload.buzzer);
+          activateTauk();
           playTaukTransition(() => router.push('/buzz'));
         },
       )
@@ -614,6 +615,7 @@ export default function GameScreen() {
     taukFiredRef.current = true;
     playSound('taukBell');
     activateTauk();
+    if (currentRound?.id) pauseRound(currentRound.id).catch(() => {});
     if (otherPlayers.length === 1) {
       playTaukTransition(() => {
         setBuzzer(myPlayer);

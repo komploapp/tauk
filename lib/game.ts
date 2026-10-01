@@ -154,7 +154,9 @@ export async function startGame(gameId: string): Promise<Round> {
 
 // ─── Créer un nouveau round ───────────────────────────────────────────────────
 
-// Must match COUNTDOWN_START in prepa.tsx so the round timer starts at durationS on the game screen.
+// Durée de la phase de préparation affichée en début de manche.
+// prepa.tsx s'ancre sur started_at, donc cette valeur pilote uniquement
+// l'affichage visuel du décompte (pas la précision du chronomètre).
 const ROUND_PREP_DELAY_S = 10;
 
 export async function createRound(gameId: string, roundNumber: number): Promise<Round> {
@@ -225,6 +227,13 @@ export async function markTaskDone(
 
 // ─── Créer une accusation TAUK! ───────────────────────────────────────────────
 
+// Appelé dès que TAUK est déclenché, avant même de créer l'accusation.
+// L'appel anticipé garantit que total_paused_ms couvre le temps entre
+// le cri "TAUK !" et la désignation de la cible (mode multi-joueur).
+export async function pauseRound(roundId: string): Promise<void> {
+  await supabase.rpc('start_round_pause', { p_round_id: roundId });
+}
+
 export async function createAccusation(
   roundId: string,
   accuserId: string,
@@ -237,9 +246,6 @@ export async function createAccusation(
     .single();
 
   if (error || !data) throw new Error(error?.message ?? 'Erreur TAUK!');
-
-  // Marque la pause côté serveur (timestamp Postgres — aucun biais d'horloge client)
-  await supabase.rpc('start_round_pause', { p_round_id: roundId });
 
   return data.id;
 }

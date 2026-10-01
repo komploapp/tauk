@@ -336,14 +336,20 @@ export default function PrepaScreen() {
   }, [currentRound?.id, myPlayer?.id]);
 
   useEffect(() => {
-    if (leftPlayer !== null) return; // countdown gelé pendant la modale
-    if (countdown <= 0) {
-      router.replace('/game');
-      return;
+    if (!currentRound?.started_at || leftPlayer !== null) return;
+
+    const startedAtMs = new Date(currentRound.started_at).getTime();
+
+    function tick() {
+      const remaining = Math.max(0, Math.ceil((startedAtMs - Date.now()) / 1000));
+      setCountdown(remaining);
+      if (remaining <= 0) router.replace('/game');
     }
-    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(id);
-  }, [countdown, leftPlayer]);
+
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [currentRound?.started_at, leftPlayer]);
 
   function handleDragStart(fromIdx: number) {
     setDragFrom(fromIdx);
