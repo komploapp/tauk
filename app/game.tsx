@@ -395,6 +395,8 @@ export default function GameScreen() {
   const accusationChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const roundChannelRef      = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const roundStatusRef       = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const resumeChannelRef     = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const readyPlayerIdsRef    = useRef(new Set<string>());
   const hasEndedRoundRef       = useRef(false);
   const taukBtnRef             = useRef<View>(null);
   const taukBtnMeasureRef      = useRef({ pageY: 0, height: 100 });
@@ -410,7 +412,7 @@ export default function GameScreen() {
   const { leftPlayer, isGameOver, dismissPlayerLeft } = usePlayerLeft();
 
   const {
-    game, myTasks, currentRound, myPlayer, players,
+    game, myTasks, currentRound, myPlayer, players, activeAccusation,
     updateTaskStatus, setActiveAccusation, setBuzzer, setCurrentRound,
     validatingTasks, addValidatingTask, removeValidatingTask,
     taukActive, taukFiredAt, activateTauk, deactivateTauk, reset,
@@ -436,25 +438,9 @@ export default function GameScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const { activeAccusation, currentRound: round, myPlayer: me, taukFiredAt: fired } = useStore.getState();
-      if (activeAccusation?.result === 'pending' && activeAccusation.accuser_id === me?.id) {
-        // Swipe-back depuis /spectateur : l'accusation est encore pending → l'annuler
-        cancelAccusation(activeAccusation.id).catch(() => {});
-      } else if (activeAccusation?.id && round) {
-        // Fallback accusateur : spectateur.tsx appelle le RPC à la fermeture de la modale,
-        // mais si l'accusateur est revenu via handleBack (sans passer par la modale),
-        // on déclenche ici. Gated sur paused_since pour ne pas fausser total_paused_ms
-        // si le Realtime est déjà arrivé avant useFocusEffect.
-        if (activeAccusation.accuser_id === me?.id && round.paused_since) {
-          const pauseStartMs = new Date(round.paused_since).getTime();
-          const pauseDuration = Math.max(0, Date.now() - pauseStartMs);
-          setCurrentRound({ ...round, total_paused_ms: (round.total_paused_ms ?? 0) + pauseDuration, paused_since: null });
-          const accusationId = activeAccusation.id;
-          (async () => { try { await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: accusationId }); } catch {} })();
-        }
-        // Les non-accusateurs naviguent depuis accuse.tsx / buzz.tsx uniquement quand
-        // ils reçoivent le Realtime paused_since = null (voir ces fichiers).
-        // À ce stade paused_since est déjà null dans leur store → deactivateTauk() suffit.
+      const { activeAccusation: acc, myPlayer: me } = useStore.getState();
+      if (acc?.result === 'pending' && acc.accuser_id === me?.id) {
+        cancelAccusation(acc.id).catch(() => {});
       }
       deactivateTauk();
       taukOverlayOpacity.value = 0;
@@ -463,6 +449,46 @@ export default function GameScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
+
+  // Coordination "tous prêts" : quand tous les joueurs sont revenus sur game.tsx
+  // après une accusation, l'accusateur déclenche le RPC qui libère le chrono.
+  useEffect(() => {
+    if (!activeAccusation?.id || !currentRound?.paused_since || !myPlayer?.id) return;
+
+    readyPlayerIdsRef.current.clear();
+    if (resumeChannelRef.current) {
+      supabase.removeChannel(resumeChannelRef.current);
+      resumeChannelRef.current = null;
+    }
+
+    const channel = supabase
+      .channel(`resume-ready-${activeAccusation.id}`)
+      .on('broadcast', { event: 'ready_for_resume' }, ({ payload }: { payload: { playerId: string } }) => {
+        readyPlayerIdsRef.current.add(payload.playerId);
+        const { players: ps, myPlayer: me, activeAccusation: acc } = useStore.getState();
+        if (readyPlayerIdsRef.current.size >= ps.length && me?.id === acc?.accuser_id && acc?.id) {
+          (async () => { try { await supabase.rpc('commit_round_pause_from_accusation', { p_accusation_id: acc.id }); } catch {} })();
+        }
+      })
+      .subscribe(() => {
+        channel.send({ type: 'broadcast', event: 'ready_for_resume', payload: { playerId: myPlayer.id } });
+      });
+
+    resumeChannelRef.current = channel;
+
+    const intervalId = setInterval(() => {
+      const { currentRound: r, myPlayer: p } = useStore.getState();
+      if (!r?.paused_since) { clearInterval(intervalId); return; }
+      if (p?.id) channel.send({ type: 'broadcast', event: 'ready_for_resume', payload: { playerId: p.id } });
+    }, 500);
+
+    return () => {
+      clearInterval(intervalId);
+      supabase.removeChannel(channel);
+      resumeChannelRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAccusation?.id, currentRound?.id]);
 
   useEffect(() => {
     if (myTasks.length > 0 && localOrder.length === 0) {
@@ -768,6 +794,10 @@ export default function GameScreen() {
             </Pressable>
           </View>
 
+          {!!activeAccusation?.id && !!currentRound?.paused_since && (
+              <Text style={styles.waitingText}>En attente des autres joueurs...</Text>
+            )}
+
           {activeTask && (
             <View style={styles.activeChallenge}>
               <Text style={styles.activeChallengeText}>{activeTask.task_text}</Text>
@@ -936,6 +966,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1, minWidth: 52, textAlign: 'center',
   },
   timerTextUrgent: { color: palette.brandPink },
+  waitingText: {
+    fontFamily: 'Recursive_400Regular',
+    fontSize: 14,
+    color: palette.brandPink,
+    opacity: 0.6,
+    textAlign: 'center',
+  },
   iconBtn: {
     width: 32, height: 32, borderRadius: 60,
     backgroundColor: 'rgba(255, 20, 134, 0.1)',

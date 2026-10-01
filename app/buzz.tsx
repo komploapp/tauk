@@ -51,8 +51,6 @@ export default function BuzzScreen() {
   const bcChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [pointModalData, setPointModalData] = useState<PointAttributionData | null>(null);
   const postModalRef = useRef<() => void>(() => {});
-  const [waitingForResume, setWaitingForResume] = useState(false);
-  const waitingRef = useRef(false);
   const { game, buzzer, myPlayer, currentRound, setActiveAccusation, setCurrentRound, players, reset } = useStore();
   const { leftPlayer, isGameOver, dismissPlayerLeft } = usePlayerLeft();
 
@@ -60,15 +58,6 @@ export default function BuzzScreen() {
     setPointModalData(null);
     postModalRef.current();
   }
-
-  // Sécurité : si le Realtime n'arrive pas dans les 8 s, on navigue quand même.
-  useEffect(() => {
-    if (!waitingForResume) return;
-    const id = setTimeout(() => {
-      if (waitingRef.current) { waitingRef.current = false; router.replace('/game'); }
-    }, 8000);
-    return () => clearTimeout(id);
-  }, [waitingForResume]);
 
   function handleQuit() {
     Alert.alert(
@@ -132,17 +121,7 @@ export default function BuzzScreen() {
             };
           }
 
-          postModalRef.current = () => {
-            const { currentRound: round } = useStore.getState();
-            if (!round?.paused_since) {
-              // L'accusateur a déjà commité — navigation directe.
-              router.replace('/game');
-            } else {
-              // On attend le Realtime paused_since = null.
-              waitingRef.current = true;
-              setWaitingForResume(true);
-            }
-          };
+          postModalRef.current = () => router.replace('/game');
           setPointModalData(data);
         },
       )
@@ -155,13 +134,6 @@ export default function BuzzScreen() {
           if (newRound.status === 'countdown') {
             const { players: p } = useStore.getState();
             router.replace(p.length <= 2 ? '/resultat-manche-1v1' : '/resultat-manche');
-            return;
-          }
-          // Reprise synchronisée : paused_since = null signifie que l'accusateur
-          // a commité la pause → tout le monde peut retourner sur /game.
-          if (!newRound.paused_since && waitingRef.current) {
-            waitingRef.current = false;
-            router.replace('/game');
           }
         },
       )
@@ -230,7 +202,7 @@ export default function BuzzScreen() {
       <View style={styles.waitingArea} pointerEvents="box-none">
         <View style={styles.waitingBox}>
           <Text style={styles.waitingText}>
-            {waitingForResume ? 'En attente des autres joueurs...' : 'Il aiguise son couteau...'}
+            {'Il aiguise son couteau...'}
           </Text>
         </View>
       </View>

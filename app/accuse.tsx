@@ -54,19 +54,8 @@ const CHARACTER_BG: Record<Character, string> = {
 export default function AccuseScreen() {
   const [challengeVisible, setChallengeVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [waitingForResume, setWaitingForResume] = useState(false);
-  const waitingRef = useRef(false);
 
   useEffect(() => { playSound('accusation'); }, []);
-
-  // Sécurité : si le Realtime n'arrive pas dans les 8 s, on navigue quand même.
-  useEffect(() => {
-    if (!waitingForResume) return;
-    const id = setTimeout(() => {
-      if (waitingRef.current) { waitingRef.current = false; router.replace('/game'); }
-    }, 8000);
-    return () => clearTimeout(id);
-  }, [waitingForResume]);
   const [pointModalData, setPointModalData] = useState<PointAttributionData | null>(null);
   const postModalRef = useRef<() => void>(() => {});
   const roundStatusRef   = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -104,11 +93,6 @@ export default function AccuseScreen() {
             const { players: p } = useStore.getState();
             router.replace(p.length <= 2 ? '/resultat-manche-1v1' : '/resultat-manche');
             return;
-          }
-          // Reprise synchronisée : l'accusateur a commité la pause → paused_since = null.
-          if (!newRound.paused_since && waitingRef.current) {
-            waitingRef.current = false;
-            router.replace('/game');
           }
         },
       )
@@ -160,17 +144,7 @@ export default function AccuseScreen() {
 
   function showPointModal(data: PointAttributionData) {
     playSound('bonusPoint');
-    postModalRef.current = () => {
-      const { currentRound: round } = useStore.getState();
-      if (!round?.paused_since) {
-        // L'accusateur a déjà commité (Realtime arrivé) — on peut naviguer directement.
-        router.replace('/game');
-      } else {
-        // On attend le Realtime paused_since = null déclenché par l'accusateur.
-        waitingRef.current = true;
-        setWaitingForResume(true);
-      }
-    };
+    postModalRef.current = () => router.replace('/game');
     setPointModalData(data);
   }
 
@@ -285,14 +259,6 @@ export default function AccuseScreen() {
         onClose={handlePointModalClose}
         data={pointModalData}
       />
-
-      {waitingForResume && (
-        <View style={styles.waitingOverlay}>
-          <View style={styles.waitingBox}>
-            <Text style={styles.waitingText}>En attente des autres joueurs...</Text>
-          </View>
-        </View>
-      )}
 
       {/* ── Header flottant ── */}
       <SafeAreaView style={styles.headerSafe} edges={['top']} pointerEvents="box-none">
@@ -450,26 +416,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  waitingOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingBottom: 48,
-  },
-  waitingBox: {
-    backgroundColor: 'rgba(255, 20, 134, 0.04)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  waitingText: {
-    fontFamily: 'Recursive_400Regular',
-    fontSize: 20,
-    color: palette.brandPink,
-    opacity: 0.5,
-    width: 230,
-    lineHeight: 26,
-  },
 });
